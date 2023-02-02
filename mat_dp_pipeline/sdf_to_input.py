@@ -222,10 +222,3 @@ def sdf_to_processable_input(
                 indicators=indicators.loc[year, :],
             )
             yield path, year, inpt
-
-
-for path, year, inpt in sdf_to_processable_input(Path("tests/data/HierachyTest")):
-    print("---", path, year, "----")
-    print("intensities:\n", inpt.intensities)
-    print("\nindicators:\n", inpt.indicators)
-    print("\ntargets:\n", inpt.targets)
