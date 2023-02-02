@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "mat-dp-pipeline"
+version = "0.1.0"
+description = ""
+authors = ["Marcin Krupowicz <ma@rcin.me>"]
+readme = "README.md"
+packages = [{include = "mat_dp_pipeline"}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4"
+typer = {extras = ["all"], version = "^0.7.0"}
+pytest = "^7.2.1"
+pandas = "^1.5.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,5 @@
+Category,Specific,Description,Material Unit,Production Unit,Steel,Silicon,PVC,Steel_growth
+Railway,Tram tracks,Tracks usually placed within roads,tonnes,km,1,0,0,0.1
+Railway,Standard railway,,tonnes,km,1.5,0.2,0.4,-0.1
+Power plant,Coal,,kg,MW,3,1,0.5,
+Power plant,Gas,,kg,MW,4,2,1,0.5
