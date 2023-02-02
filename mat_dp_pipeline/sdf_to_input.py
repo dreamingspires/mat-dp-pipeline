@@ -76,23 +76,42 @@ class ProcessableInput:
 
 
 def overlay_with_files(
-    df: pd.DataFrame, dir: Path, reader: sdf.InputReader, by_year: bool = True
+    df: pd.DataFrame, dir: Path, reader: sdf.InputReader
 ) -> pd.DataFrame:
     """Overlay `df` with data from the files in `dir`"""
     assert dir.is_dir()
     overlayed = df
-    for file in filter(lambda f: f.is_file(), dir.iterdir()):
-        if not (match := reader.file_pattern.match(file.name)):
-            continue
+
+    files = sorted(
+        filter(
+            lambda f: f.is_file() and reader.file_pattern.match(f.name), dir.iterdir()
+        )
+    )
+
+    base_keys = None
+    for i, file in enumerate(files):
+        # base -- for example tech.csv, but not tech2015.csv
+        is_base_file = i == 0
         read_df = reader.read(file)
 
-        if by_year:
-            year = match.group(1) or Year(0)  # 0 -- initial
-            year = Year(year)
-            # Add "Year" level to the index. Concat is idiomatic way of doing it
-            update_df = pd.concat({year: read_df}, names=["Year"])
+        match = reader.file_pattern.match(file.name)
+        assert match
+
+        if is_base_file:
+            assert match.group(1) is None, "First file is yearly but should be base!"
+            year = Year(0)
+            base_keys = set(read_df.index.to_list())
         else:
-            update_df = read_df
+            year = match.group(1)
+            assert year is not None, "Invalid yearly file name!"
+            year = Year(year)
+            keys = set(read_df.index.to_list())
+            assert (
+                base_keys and keys <= base_keys
+            ), "Yearly file cannot introduce new items!"
+
+        # Add "Year" level to the index. Concat is idiomatic way of doing it
+        update_df = pd.concat({year: read_df}, names=["Year"])
 
         if overlayed.empty:
             overlayed = update_df.copy()
@@ -117,9 +136,6 @@ def sdf_to_combined_input(root_dir: Path) -> Iterator[tuple[Path, CombinedInput]
         overlayed.indicators = overlay_with_files(
             overlayed.indicators, root, sdf.IndicatorsReader()
         )
-        overlayed.targets = overlay_with_files(
-            overlayed.targets, root, sdf.TargetsReader(), by_year=False
-        )
 
         # Go down in the hierarchy
         for dir in sub_directories:
@@ -127,6 +143,10 @@ def sdf_to_combined_input(root_dir: Path) -> Iterator[tuple[Path, CombinedInput]
 
         # Yield only leaves
         if not sub_directories:
+            targets_file = root / "targets.csv"
+            assert targets_file.is_file(), "Missing targets file on the leaf level!"
+            overlayed.targets = sdf.TargetsReader().read(targets_file)
+
             assert overlayed.validate()
             yield label, overlayed
 
@@ -202,3 +222,10 @@ def sdf_to_processable_input(
                 indicators=indicators.loc[year, :],
             )
             yield path, year, inpt
+
+
+for path, year, inpt in sdf_to_processable_input(Path("tests/data/HierachyTest")):
+    print("---", path, year, "----")
+    print("intensities:\n", inpt.intensities)
+    print("\nindicators:\n", inpt.indicators)
+    print("\ntargets:\n", inpt.targets)
