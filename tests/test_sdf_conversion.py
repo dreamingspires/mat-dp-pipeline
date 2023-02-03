@@ -7,6 +7,7 @@ from pandas.testing import assert_frame_equal
 import pytest
 
 from mat_dp_pipeline.sdf_to_input import (
+    sdf_to_combined_input,
     sdf_to_processable_input,
     ProcessableInput,
     Year,
@@ -75,3 +76,8 @@ def test_hierarchy(data_path, test_name: str):
                 f"Expected markdown file ({expected_file}) does not exist! You can find the generated one here: {output_path}"
             )
             raise err
+
+
+def test_failure_new_tech_in_yearly_file(data_path):
+    with pytest.raises(AssertionError, match="Yearly file cannot introduce new items!"):
+        list(sdf_to_combined_input(data_path("Invalid_YearlyFileWithNewTech")))

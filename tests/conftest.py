@@ -12,3 +12,5 @@ def data_path():
         return Path(__file__).parent / "data" / (suffix or "")
 
     return inner
+
+

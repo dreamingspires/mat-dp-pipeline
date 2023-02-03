@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import itertools
 from pathlib import Path
-import re
 from typing import Iterator
 
 import pandas as pd
@@ -73,6 +72,30 @@ class ProcessableInput:
             targets=self.targets.copy(),
             indicators=self.indicators.copy(),
         )
+
+    def save(self, dir: Path, exist_ok: bool = False) -> None:
+        """Save ProcessableInput to files in a directory `dir`
+
+        Args:
+            dir (Path): output directory (must exist)
+            exist_ok (bool, optional): Is it OK if files exist already. They will be overriden if so. Defaults to False.
+        """
+        assert dir.is_dir()
+
+        intensities_file = dir / "intensities.csv"
+        targets_file = dir / "targets.csv"
+        indicators_file = dir / "indicators.csv"
+
+        if not exist_ok:
+            assert (
+                not intensities_file.exists()
+                and not targets_file.exists()
+                and not indicators_file.exists()
+            )
+
+        self.intensities.to_csv(intensities_file)
+        self.targets.to_csv(targets_file)
+        self.indicators.to_csv(indicators_file)
 
 
 def overlay_with_files(
@@ -217,8 +240,8 @@ def sdf_to_processable_input(
         # We only consider target years, starting from the second one.
         for year in target_years:
             inpt = ProcessableInput(
-                intensities=intensities.loc[year, :],
-                targets=targets.loc[:, str(year)],
-                indicators=indicators.loc[year, :],
+                intensities=intensities.loc[year, :].sort_index(),
+                targets=targets.loc[:, str(year)].sort_index(),
+                indicators=indicators.loc[year, :].sort_index(),
             )
             yield path, year, inpt
