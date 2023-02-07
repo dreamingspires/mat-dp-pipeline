@@ -1,23 +1,11 @@
 import pandas as pd
 
 from mat_dp_pipeline.sdf_to_input import ProcessableInput
-from mat_dp_pipeline.calculation import calculate, ProcessableInput
+from mat_dp_pipeline.calculation import calculate
 
 
-def test_calculation(data_path):
-    root = data_path("CalculationTest")
-
-    intensities = pd.read_csv(root / "techs.csv").set_index(["Category", "Specific"])
-    indicators = pd.read_csv(root / "indicators.csv").set_index("Material")
-    targets = (
-        pd.read_csv(root / "targets.csv").set_index(["Category", "Specific"]).iloc[:, 0]
-    )
-
-    inpt = ProcessableInput(
-        intensities=intensities, targets=targets, indicators=indicators
-    )
-
-    result = calculate(inpt)
+def test_calculation(calculation_test_input):
+    result = calculate(calculation_test_input)
     expected_emissions = pd.DataFrame(
         data=[("Steel", 115.5, 220.5), ("Wood", 2205.0, 2310.0)],
         columns=["Resource", "CO2", "PM25"],

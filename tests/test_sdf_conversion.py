@@ -3,14 +3,13 @@ import logging
 from pathlib import Path
 from typing import TextIO
 
-from pandas.testing import assert_frame_equal
 import pytest
 
+from mat_dp_pipeline import standard_data_format as sdf
 from mat_dp_pipeline.sdf_to_input import (
     sdf_to_combined_input,
     sdf_to_processable_input,
     ProcessableInput,
-    Year,
 )
 
 
@@ -18,7 +17,7 @@ class DiffError(Exception):
     pass
 
 
-def to_markdown(output: TextIO, path: Path, year: Year, inpt: ProcessableInput):
+def to_markdown(output: TextIO, path: Path, year: sdf.Year, inpt: ProcessableInput):
     s = f"""
 ## {path} -- {year}
 ### Intensities
@@ -41,7 +40,7 @@ def to_markdown(output: TextIO, path: Path, year: Year, inpt: ProcessableInput):
 
 def process_sdf_to_markdown(root: Path, output: TextIO):
     output.write(f"# {root.name} processed into ProcesableInput\n")
-    for path, year, inpt in sdf_to_processable_input(root):
+    for path, year, inpt in sdf_to_processable_input(sdf.load(root)):
         to_markdown(output, path, year, inpt)
 
 
@@ -80,4 +79,6 @@ def test_hierarchy(data_path, test_name: str):
 
 def test_failure_new_tech_in_yearly_file(data_path):
     with pytest.raises(AssertionError, match="Yearly file cannot introduce new items!"):
-        list(sdf_to_combined_input(data_path("Invalid_YearlyFileWithNewTech")))
+        list(
+            sdf_to_combined_input(sdf.load(data_path("Invalid_YearlyFileWithNewTech")))
+        )
