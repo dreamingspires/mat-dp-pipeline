@@ -9,7 +9,7 @@ from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 
 from mat_dp_pipeline import Pipeline
-from mat_dp_pipeline.pipeline import LabelledOutput
+from mat_dp_pipeline.pipeline import LabelledOutput, PipelineOutput
 from mat_dp_pipeline.standard_data_format import Year
 
 
@@ -51,7 +51,7 @@ class App:
     outputs: dict[tuple[str, Year], LabelledOutput]
     selected_output: LabelledOutput | None
 
-    def __init__(self, outputs: list[LabelledOutput]):
+    def __init__(self, outputs: PipelineOutput):
         self.dash_app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
         self.register_callback(
             self.render_graph_tab,
@@ -61,8 +61,8 @@ class App:
             Input("year", "value"),
         )
 
-        self.outputs = {(str(o.path), o.year): o for o in outputs}
-        assert len(self.outputs) == len(outputs), "Duplicated keys found!"
+        self.outputs = {(str(o.path), o.year): o for o in outputs.data}
+        assert len(self.outputs) == len(outputs.data), "Duplicated keys found!"
         self.selected_output = None
 
     def controls(self):

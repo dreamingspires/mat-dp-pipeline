@@ -19,6 +19,13 @@ class LabelledOutput(ProcessedOutput):
     path: Path
 
 
+class PipelineOutput:
+    data: list[LabelledOutput]
+
+    def __init__(self, data: list[LabelledOutput]):
+        self.data = data
+
+
 PipelineCallback = Callable[[], None]
 ProcessableInputHook = Callable[[ProcessableInput], ProcessableInput]
 
@@ -70,7 +77,7 @@ class Pipeline:
         *,
         prepared_sdf_callback: PipelineCallback | None = None,
         combined_callback: PipelineCallback | None = None,
-    ) -> list[LabelledOutput]:
+    ) -> PipelineOutput:
         data = self._prepare_sdf()
 
         if prepared_sdf_callback:
@@ -96,4 +103,4 @@ class Pipeline:
                     )
                 )
 
-        return outputs
+        return PipelineOutput(outputs)
