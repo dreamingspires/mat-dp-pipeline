@@ -35,7 +35,9 @@ class ProcessedOutput:
 
 
 def calculate(inpt: ProcessableInput) -> ProcessedOutput:
-    required_resources = inpt.intensities.mul(inpt.targets, axis="index")
+    required_resources = inpt.intensities.mul(inpt.targets, axis="index").rename_axis(
+        index=["Category", "Specific"]
+    )
     emissions_dict: dict[str, pd.Series] = {
         str(indicator): required_resources.sum(axis=0).mul(inpt.indicators[indicator])
         for indicator in inpt.indicators.columns
