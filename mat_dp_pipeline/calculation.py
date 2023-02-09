@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from functools import cache
-import typing
 
 import pandas as pd
 

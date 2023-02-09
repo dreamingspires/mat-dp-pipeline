@@ -7,9 +7,9 @@ import pytest
 
 from mat_dp_pipeline import standard_data_format as sdf
 from mat_dp_pipeline.sdf_to_input import (
+    ProcessableInput,
     sdf_to_combined_input,
     sdf_to_processable_input,
-    ProcessableInput,
 )
 
 

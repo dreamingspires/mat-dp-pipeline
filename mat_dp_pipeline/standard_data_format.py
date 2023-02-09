@@ -1,14 +1,13 @@
+import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from mat_dp_pipeline.common import FileOrPath
-
 
 Year = int
 
@@ -105,31 +104,30 @@ class StandardDataFormat:
                 "SDF must either have children in the hierarchy or defined targets (leaf level)"
             )
 
-    def save(self, dir: Path) -> None:
-        assert dir.is_dir()
-        dir = dir / self.name
-        dir.mkdir(parents=True, exist_ok=True)
+    def save(self, output_dir: Path) -> None:
+        assert output_dir.is_dir()
+        output_dir = output_dir / self.name
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.intensities.empty:
-            self.intensities.to_csv(dir / "intensities.csv")
+            self.intensities.to_csv(output_dir / "intensities.csv")
         for year, intensities in self.intensities_yearly.items():
-            intensities.to_csv(dir / f"intensities_{year}.csv")
+            intensities.to_csv(output_dir / f"intensities_{year}.csv")
 
         if not self.indicators.empty:
-            self.indicators.to_csv(dir / "indicators.csv")
+            self.indicators.to_csv(output_dir / "indicators.csv")
         for year, indicators in self.indicators_yearly.items():
-            indicators.to_csv(dir / f"indicators_{year}.csv")
+            indicators.to_csv(output_dir / f"indicators_{year}.csv")
 
         if self.targets is not None:
-            self.targets.to_csv(dir / "targets.csv")
+            self.targets.to_csv(output_dir / "targets.csv")
         else:
             for name, sdf in self.children.items():
-                sdf.save(dir / name)
+                sdf.save(output_dir / name)
 
 
-def load(dir: Path) -> StandardDataFormat:
-    assert dir.is_dir()
-
+def load(input_dir: Path) -> StandardDataFormat:
+    assert input_dir.is_dir()
     targets_reader = TargetsReader()
     intensities_reader = IntensitiesReader()
     indicators_reader = IndicatorsReader()
@@ -190,4 +188,4 @@ def load(dir: Path) -> StandardDataFormat:
             children=children,
         )
 
-    return dfs(dir)
+    return dfs(input_dir)
