@@ -1,16 +1,19 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Iterator
 
 import mat_dp_pipeline.standard_data_format as sdf
 from mat_dp_pipeline.calculation import ProcessedOutput, calculate
 from mat_dp_pipeline.data_source import DataSource
 from mat_dp_pipeline.sdf_to_input import (
+    CombinedInput,
     ProcessableInput,
     combined_to_processable_input,
     sdf_to_combined_input,
     validate_sdf,
 )
+
+from .abstract import AbstractPipeline
 
 
 @dataclass(frozen=True)
@@ -26,44 +29,54 @@ class PipelineOutput:
         self.data = data
 
 
-PipelineCallback = Callable[[], None]
-ProcessableInputHook = Callable[[ProcessableInput], ProcessableInput]
+CheckpointType = tuple[Path, CombinedInput]
+ProcessableFullType = tuple[Path, sdf.Year, ProcessableInput]
 
 
-class Pipeline:
-    _sdf_root: Path
+class Pipeline(
+    AbstractPipeline[
+        Iterator[CheckpointType],
+        Iterator[Iterator[ProcessableFullType]],
+        Iterator[LabelledOutput],
+        PipelineOutput,
+    ]
+):
     _data_source: DataSource | None
     validate_sdf: bool
-    processable_input_hook: ProcessableInputHook | None
 
     def __init__(
         self,
-        sdf_root: Path,
         data_source: DataSource | None = None,
         validate_sdf: bool = True,
-        processable_input_hook: ProcessableInputHook | None = None,
     ):
-        self._sdf_root = sdf_root
         self._data_source = data_source
         self.validate_sdf = validate_sdf
-        self.processable_input_hook = processable_input_hook
 
-    def _prepare_sdf(self) -> sdf.StandardDataFormat:
+    def _path_to_sdf(self, path: Path) -> sdf.StandardDataFormat:
         # Prepare the data in Standard Data Format
         if self._data_source:
             # data source is being validated after convertion
-            return self._data_source.prepare(self._sdf_root)
+            return self._data_source.prepare(path)
         else:
-            validate_sdf(self._sdf_root)
-            return sdf.load(self._sdf_root)
+            validate_sdf(path)
+            return sdf.load(path)
 
-    def __iter__(self) -> Iterator[LabelledOutput]:
-        data = self._prepare_sdf()
+    def _sdf_to_checkpoints(
+        self, sdf: sdf.StandardDataFormat
+    ) -> Iterator[CheckpointType]:
+        return sdf_to_combined_input(sdf)
 
-        for path, combined in sdf_to_combined_input(data):
-            for path, year, inpt in combined_to_processable_input(path, combined):
-                if self.processable_input_hook:
-                    inpt = self.processable_input_hook(inpt)
+    def _checkpoints_to_processable_input(
+        self, checkpoints: Iterator[CheckpointType]
+    ) -> Iterator[Iterator[ProcessableFullType]]:
+        for path, combined in checkpoints:
+            yield combined_to_processable_input(path, combined)
+
+    def _processable_to_processed(
+        self, processable: Iterator[Iterator[ProcessableFullType]]
+    ) -> Iterator[LabelledOutput]:
+        for item in processable:
+            for path, year, inpt in item:
                 result = calculate(inpt)
                 yield LabelledOutput(
                     required_resources=result.required_resources,
@@ -72,35 +85,7 @@ class Pipeline:
                     path=path,
                 )
 
-    def process(
-        self,
-        *,
-        prepared_sdf_callback: PipelineCallback | None = None,
-        combined_callback: PipelineCallback | None = None,
+    def _processed_to_output(
+        self, processed: Iterator[LabelledOutput]
     ) -> PipelineOutput:
-        data = self._prepare_sdf()
-
-        if prepared_sdf_callback:
-            prepared_sdf_callback()
-
-        combined_inputs = sdf_to_combined_input(data)
-        if combined_callback:
-            combined = list(combined_inputs)
-            combined_callback()
-
-        outputs: list[LabelledOutput] = []
-        for path, combined in combined_inputs:
-            for path, year, inpt in combined_to_processable_input(path, combined):
-                if self.processable_input_hook:
-                    inpt = self.processable_input_hook(inpt)
-                result = calculate(inpt)
-                outputs.append(
-                    LabelledOutput(
-                        required_resources=result.required_resources,
-                        emissions=result.emissions,
-                        year=year,
-                        path=path,
-                    )
-                )
-
-        return PipelineOutput(outputs)
+        return PipelineOutput(list(processed))
