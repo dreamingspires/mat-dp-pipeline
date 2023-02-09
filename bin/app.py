@@ -1,13 +1,12 @@
-import sys
 from pathlib import Path
 
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
-import plotly.graph_objects as go
 
 from mat_dp_pipeline import Pipeline
 from mat_dp_pipeline.pipeline import LabelledOutput
@@ -34,11 +33,13 @@ def emissions_by_material_fig(data: LabelledOutput) -> go.Figure:
     emissions["CO3"] = emissions["CO2"] * 2
     print(emissions)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        emissions,
-        x=["CO2", "CO3"],
-        y="Resource",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            emissions,
+            x=["CO2", "CO3"],
+            y="Resource",
+        )
+    )
     fig.update_layout(scattermode="group")
     fig.update_xaxes(type="category")
     fig.update_yaxes(type="category")
@@ -46,7 +47,6 @@ def emissions_by_material_fig(data: LabelledOutput) -> go.Figure:
 
 
 class App:
-
     dash_app: Dash
     outputs: dict[tuple[str, Year], LabelledOutput]
     selected_output: LabelledOutput | None

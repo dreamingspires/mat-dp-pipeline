@@ -2,15 +2,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterator
 
+import mat_dp_pipeline.standard_data_format as sdf
 from mat_dp_pipeline.calculation import ProcessedOutput, calculate
+from mat_dp_pipeline.data_source import DataSource
 from mat_dp_pipeline.sdf_to_input import (
     ProcessableInput,
     combined_to_processable_input,
     sdf_to_combined_input,
     validate_sdf,
 )
-from mat_dp_pipeline.data_source import DataSource
-import mat_dp_pipeline.standard_data_format as sdf
 
 
 @dataclass(frozen=True)
