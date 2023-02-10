@@ -1,7 +1,8 @@
 from abc import ABC, abstractproperty
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional, overload
 
 import mat_dp_pipeline.standard_data_format as sdf
 from mat_dp_pipeline.calculation import ProcessedOutput, calculate
@@ -18,10 +19,71 @@ class LabelledOutput(ProcessedOutput):
 
 
 class PipelineOutput:
-    data: list[LabelledOutput]
+    _by_year: dict[sdf.Year, dict[Path, LabelledOutput]]
+    _by_path: dict[Path, dict[sdf.Year, LabelledOutput]]
+    _length: int
 
     def __init__(self, data: list[LabelledOutput]):
-        self.data = data
+        self._by_year = defaultdict(dict)
+        self._by_path = defaultdict(dict)
+
+        for output in data:
+            self._by_year[output.year][output.path] = output
+            self._by_path[output.path][output.year] = output
+        self._length = len(data)
+
+    @property
+    def by_year(self) -> dict[sdf.Year, dict[Path, LabelledOutput]]:
+        return self._by_year
+
+    @property
+    def by_path(self) -> dict[Path, dict[sdf.Year, LabelledOutput]]:
+        return self._by_path
+
+    def keys(self, axis: type):
+        assert axis in (sdf.Year, Path)
+        if axis == sdf.Year:
+            return self.by_year.keys()
+        else:
+            return self.by_path.keys()
+
+    @overload
+    def __getitem__(self, key: sdf.Year) -> dict[Path, LabelledOutput]:
+        ...
+
+    @overload
+    def __getitem__(self, key: Path) -> dict[sdf.Year, LabelledOutput]:
+        ...
+
+    @overload
+    def __getitem__(self, key: tuple[sdf.Year, Path]) -> LabelledOutput:
+        ...
+
+    @overload
+    def __getitem__(self, key: tuple[Path, sdf.Year]) -> LabelledOutput:
+        ...
+
+    def __getitem__(
+        self, key: sdf.Year | Path | tuple[sdf.Year, Path] | tuple[Path, sdf.Year]
+    ) -> dict[Path, LabelledOutput] | dict[sdf.Year, LabelledOutput] | LabelledOutput:
+        if isinstance(key, sdf.Year):
+            return self.by_year[key]
+        elif isinstance(key, Path):
+            return self.by_path[key]
+        elif isinstance(key, tuple):
+            assert len(key) == 2
+            year, path = key
+            if isinstance(year, Path):
+                path, year = year, path
+            assert isinstance(year, sdf.Year) and isinstance(path, Path)
+            return self.by_year[year][path]
+
+    def __iter__(self) -> Iterator[LabelledOutput]:
+        for year, d in self.by_year.items():
+            yield from d.values()
+
+    def __len__(self) -> int:
+        return self._length
 
 
 class DataSource(ABC):

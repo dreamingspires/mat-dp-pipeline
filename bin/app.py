@@ -48,7 +48,7 @@ def emissions_by_material_fig(data: LabelledOutput) -> go.Figure:
 
 class App:
     dash_app: Dash
-    outputs: dict[tuple[str, Year], LabelledOutput]
+    outputs: PipelineOutput
     selected_output: LabelledOutput | None
 
     def __init__(self, outputs: PipelineOutput):
@@ -61,15 +61,12 @@ class App:
             Input("year", "value"),
         )
 
-        self.outputs = {(str(o.path), o.year): o for o in outputs.data}
-        assert len(self.outputs) == len(outputs.data), "Duplicated keys found!"
+        self.outputs = outputs
+        assert len(self.outputs) == len(outputs), "Duplicated keys found!"
         self.selected_output = None
 
     def controls(self):
-        countries, years = zip(*self.outputs.keys()) if self.outputs else ([], [])
-        # Unique only
-        countries = sorted(set(countries))
-        years = sorted(set(years))
+        countries = sorted(set(self.outputs.keys(Path)))
         body = dbc.CardBody(
             [
                 html.Div(
@@ -77,13 +74,7 @@ class App:
                         html.Label("Country"),
                         dcc.Dropdown(countries, id="country"),
                     ]
-                ),
-                html.Div(
-                    [
-                        html.Label("Year"),
-                        dcc.Dropdown(years, id="year"),
-                    ]
-                ),
+                )
             ]
         )
 
@@ -132,7 +123,7 @@ class App:
         return [html.H2(title), dcc.Graph(figure=fig)]
 
     def render_graph_tab(self, tab, country, year):
-        self.selected_output = self.outputs.get((country, year))
+        self.selected_output = self.outputs[country, year]
         if not self.selected_output:
             raise PreventUpdate
 
@@ -156,5 +147,5 @@ class App:
 
 if __name__ == "__main__":
     path = Path("tests/data/World")
-    outputs = Pipeline(path).process()
-    App(outputs).serve()
+    output = Pipeline(path).process()
+    App(output).serve()
