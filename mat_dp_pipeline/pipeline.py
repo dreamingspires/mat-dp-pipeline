@@ -1,10 +1,10 @@
+from abc import abstractproperty
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
 import mat_dp_pipeline.standard_data_format as sdf
 from mat_dp_pipeline.calculation import ProcessedOutput, calculate
-from mat_dp_pipeline.data_source import DataSource
 from mat_dp_pipeline.sdf_to_input import (
     CombinedInput,
     ProcessableInput,
@@ -27,6 +27,12 @@ class PipelineOutput:
         self.data = data
 
 
+class DataSource:
+    @abstractproperty
+    def sdf(self) -> sdf.StandardDataFormat:
+        ...
+
+
 CheckpointType = tuple[Path, CombinedInput]
 ProcessableFullType = tuple[Path, sdf.Year, ProcessableInput]
 
@@ -37,20 +43,23 @@ class Pipeline:
 
     def __init__(
         self,
-        data_source: DataSource | None = None,
         validate_sdf: bool = True,
     ):
-        self._data_source = data_source
         self.validate_sdf = validate_sdf
 
-    def _path_to_sdf(self, path: Path) -> sdf.StandardDataFormat:
+    def _input_to_sdf(
+        self, input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
+    ) -> sdf.StandardDataFormat:
         # Prepare the data in Standard Data Format
-        if self._data_source:
-            # data source is being validated after convertion
-            return self._data_source.prepare(path)
+        if isinstance(input_data, Path):
+            if self.validate_sdf:
+                validate_sdf(input_data)
+            out_sdf = sdf.load(input_data)
         else:
-            validate_sdf(path)
-            return sdf.load(path)
+            out_sdf = input_data.sdf
+        if output_sdf_dir:
+            out_sdf.save(output_sdf_dir)
+        return out_sdf
 
     def _sdf_to_checkpoints(
         self, sdf: sdf.StandardDataFormat
@@ -81,11 +90,15 @@ class Pipeline:
     ) -> PipelineOutput:
         return PipelineOutput(list(processed))
 
-    def __call__(self, path: Path) -> PipelineOutput:
+    def __call__(
+        self, input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
+    ) -> PipelineOutput:
         return self._processed_to_output(
             self._processable_to_processed(
                 self._checkpoints_to_processable_input(
-                    self._sdf_to_checkpoints(self._path_to_sdf(path))
+                    self._sdf_to_checkpoints(
+                        self._input_to_sdf(input_data, output_sdf_dir)
+                    )
                 )
             )
         )
