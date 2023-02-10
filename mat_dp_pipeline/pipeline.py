@@ -38,7 +38,6 @@ ProcessableFullType = tuple[Path, sdf.Year, ProcessableInput]
 
 
 class Pipeline:
-    _data_source: DataSource | None
     validate_sdf: bool
 
     def __init__(
