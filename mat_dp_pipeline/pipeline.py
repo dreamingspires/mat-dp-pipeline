@@ -13,8 +13,6 @@ from mat_dp_pipeline.sdf_to_input import (
     validate_sdf,
 )
 
-from .abstract import AbstractPipeline
-
 
 @dataclass(frozen=True)
 class LabelledOutput(ProcessedOutput):
@@ -33,14 +31,7 @@ CheckpointType = tuple[Path, CombinedInput]
 ProcessableFullType = tuple[Path, sdf.Year, ProcessableInput]
 
 
-class Pipeline(
-    AbstractPipeline[
-        Iterator[CheckpointType],
-        Iterator[Iterator[ProcessableFullType]],
-        Iterator[LabelledOutput],
-        PipelineOutput,
-    ]
-):
+class Pipeline:
     _data_source: DataSource | None
     validate_sdf: bool
 
@@ -89,3 +80,12 @@ class Pipeline(
         self, processed: Iterator[LabelledOutput]
     ) -> PipelineOutput:
         return PipelineOutput(list(processed))
+
+    def __call__(self, path: Path) -> PipelineOutput:
+        return self._processed_to_output(
+            self._processable_to_processed(
+                self._checkpoints_to_processable_input(
+                    self._sdf_to_checkpoints(self._path_to_sdf(path))
+                )
+            )
+        )
