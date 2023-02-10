@@ -9,9 +9,9 @@ from mat_dp_pipeline.sdf_to_input import ProcessableInput
 @pytest.fixture()
 def data_path():
     def inner(suffix: Path | None = None) -> Path:
-        p = Path(__file__).parent / "data" / (suffix or "")
+        p = Path(__file__).parent.parent / "test_data" / (suffix or "")
         print(p)
-        return Path(__file__).parent / "data" / (suffix or "")
+        return p
 
     return inner
 
