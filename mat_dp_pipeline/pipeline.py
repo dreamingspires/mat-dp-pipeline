@@ -1,13 +1,11 @@
 from abc import ABC, abstractproperty
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 import mat_dp_pipeline.standard_data_format as sdf
 from mat_dp_pipeline.calculation import ProcessedOutput, calculate
 from mat_dp_pipeline.sdf_to_input import (
-    CombinedInput,
-    ProcessableInput,
     combined_to_processable_input,
     sdf_to_combined_input,
 )
@@ -32,61 +30,25 @@ class DataSource(ABC):
         ...
 
 
-CheckpointType = tuple[Path, CombinedInput]
-ProcessableFullType = tuple[Path, sdf.Year, ProcessableInput]
-
-
-class Pipeline:
-    def _input_to_sdf(
-        self, input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
-    ) -> sdf.StandardDataFormat:
-        # Prepare the data in Standard Data Format
-        if isinstance(input_data, Path):
-            out_sdf = sdf.load(input_data)
-        else:
-            out_sdf = input_data.sdf
-        if output_sdf_dir:
-            out_sdf.save(output_sdf_dir)
-        return out_sdf
-
-    def _sdf_to_checkpoints(
-        self, sdf: sdf.StandardDataFormat
-    ) -> Iterator[CheckpointType]:
-        return sdf_to_combined_input(sdf)
-
-    def _checkpoints_to_processable_input(
-        self, checkpoints: Iterator[CheckpointType]
-    ) -> Iterator[Iterator[ProcessableFullType]]:
-        for path, combined in checkpoints:
-            yield combined_to_processable_input(path, combined)
-
-    def _processable_to_processed(
-        self, processable: Iterator[Iterator[ProcessableFullType]]
-    ) -> Iterator[LabelledOutput]:
-        for item in processable:
-            for path, year, inpt in item:
-                result = calculate(inpt)
-                yield LabelledOutput(
+def pipeline(
+    input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
+) -> PipelineOutput:
+    if isinstance(input_data, Path):
+        out_sdf = sdf.load(input_data)
+    else:
+        out_sdf = input_data.sdf
+    if output_sdf_dir:
+        out_sdf.save(output_sdf_dir)
+    processed = []
+    for path, combined in sdf_to_combined_input(out_sdf):
+        for path, year, inpt in combined_to_processable_input(path, combined):
+            result = calculate(inpt)
+            processed.append(
+                LabelledOutput(
                     required_resources=result.required_resources,
                     emissions=result.emissions,
                     year=year,
                     path=path,
                 )
-
-    def _processed_to_output(
-        self, processed: Iterator[LabelledOutput]
-    ) -> PipelineOutput:
-        return PipelineOutput(list(processed))
-
-    def __call__(
-        self, input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
-    ) -> PipelineOutput:
-        return self._processed_to_output(
-            self._processable_to_processed(
-                self._checkpoints_to_processable_input(
-                    self._sdf_to_checkpoints(
-                        self._input_to_sdf(input_data, output_sdf_dir)
-                    )
-                )
             )
-        )
+    return PipelineOutput(processed)
