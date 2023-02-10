@@ -8,7 +8,7 @@ from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 
-from mat_dp_pipeline import Pipeline
+from mat_dp_pipeline import pipeline
 from mat_dp_pipeline.pipeline import LabelledOutput, PipelineOutput
 from mat_dp_pipeline.standard_data_format import Year
 
@@ -146,6 +146,6 @@ class App:
 
 
 if __name__ == "__main__":
-    path = Path("tests/data/World")
-    output = Pipeline(path).process()
+    path = Path(__file__).parent.parent / "test_data/World"
+    output = pipeline(path)
     App(output).serve()
