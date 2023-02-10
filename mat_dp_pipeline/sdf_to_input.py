@@ -225,17 +225,3 @@ def sdf_to_processable_input(
 ) -> Iterator[tuple[Path, sdf.Year, ProcessableInput]]:
     for path, combined in sdf_to_combined_input(root):
         yield from combined_to_processable_input(path, combined)
-
-
-def validate_sdf(root: Path):
-    """Validate that `root` is a directory containing well defined Standard Data Format.
-
-    Args:
-        root (Path): root directory
-
-    Raises: when parsing of the SDF fails at some point.
-    """
-    # Pass `root` through `sdf_to_combined_input`, ignoring the result of it
-    # TODO: This means pipeline calls sdf_to_combined_input twice - not ideal,
-    # could either solve with caching or alternatively is this check needed here?
-    list(sdf_to_combined_input(sdf.load(root)))

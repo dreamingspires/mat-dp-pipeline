@@ -10,7 +10,6 @@ from mat_dp_pipeline.sdf_to_input import (
     ProcessableInput,
     combined_to_processable_input,
     sdf_to_combined_input,
-    validate_sdf,
 )
 
 
@@ -38,21 +37,11 @@ ProcessableFullType = tuple[Path, sdf.Year, ProcessableInput]
 
 
 class Pipeline:
-    validate_sdf: bool
-
-    def __init__(
-        self,
-        validate_sdf: bool = True,
-    ):
-        self.validate_sdf = validate_sdf
-
     def _input_to_sdf(
         self, input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
     ) -> sdf.StandardDataFormat:
         # Prepare the data in Standard Data Format
         if isinstance(input_data, Path):
-            if self.validate_sdf:
-                validate_sdf(input_data)
             out_sdf = sdf.load(input_data)
         else:
             out_sdf = input_data.sdf
