@@ -1,3 +1,3 @@
-from mat_dp_pipeline.pipeline import LabelledOutput, Pipeline
+from mat_dp_pipeline.pipeline import DataSource, LabelledOutput, Pipeline
 
-__all__ = ["LabelledOutput", "Pipeline"]
+__all__ = ["LabelledOutput", "Pipeline", "DataSource"]
