@@ -165,8 +165,8 @@ def load(input_dir: Path) -> StandardDataFormat:
             elif targets_reader.file_pattern.match(file.name):
                 targets = targets_reader.read(file)
 
-        for dir in sub_directories:
-            children[dir.name] = dfs(dir)
+        for sub_directory in sub_directories:
+            children[sub_directory.name] = dfs(sub_directory)
 
         # If not intensities or indicators were provided, use empty ones
         if intensities is None:

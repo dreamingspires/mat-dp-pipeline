@@ -71,18 +71,18 @@ class ProcessableInput:
             indicators=self.indicators.copy(),
         )
 
-    def save(self, dir: Path, exist_ok: bool = False) -> None:
-        """Save ProcessableInput to files in a directory `dir`
+    def save(self, directory: Path, exist_ok: bool = False) -> None:
+        """Save ProcessableInput to files in a directory
 
         Args:
-            dir (Path): output directory (must exist)
-            exist_ok (bool, optional): Is it OK if files exist already. They will be overriden if so. Defaults to False.
+            directory (Path): output directory (must exist)
+            exist_ok (bool, optional):  Is it OK if files exist already. They will be overriden if so. Defaults to False.
         """
-        assert dir.is_dir()
+        assert directory.is_dir()
 
-        intensities_file = dir / "intensities.csv"
-        targets_file = dir / "targets.csv"
-        indicators_file = dir / "indicators.csv"
+        intensities_file = directory / "intensities.csv"
+        targets_file = directory / "targets.csv"
+        indicators_file = directory / "indicators.csv"
 
         if not exist_ok:
             assert (
@@ -140,8 +140,8 @@ def sdf_to_combined_input(
         )
 
         # Go down in the hierarchy
-        for name, dir in root.children.items():
-            yield from dfs(dir, overlayed, label / name)
+        for name, directory in root.children.items():
+            yield from dfs(directory, overlayed, label / name)
 
         # Yield only leaves
         if not root.children:
@@ -236,5 +236,6 @@ def validate_sdf(root: Path):
     Raises: when parsing of the SDF fails at some point.
     """
     # Pass `root` through `sdf_to_combined_input`, ignoring the result of it
-    for _ in sdf_to_combined_input(sdf.load(root)):
-        pass
+    # TODO: This means pipeline calls sdf_to_combined_input twice - not ideal,
+    # could either solve with caching or alternatively is this check needed here?
+    list(sdf_to_combined_input(sdf.load(root)))
