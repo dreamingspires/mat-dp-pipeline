@@ -1,4 +1,4 @@
-from abc import abstractproperty
+from abc import ABC, abstractproperty
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Optional
@@ -27,7 +27,7 @@ class PipelineOutput:
         self.data = data
 
 
-class DataSource:
+class DataSource(ABC):
     @abstractproperty
     def sdf(self) -> sdf.StandardDataFormat:
         ...
