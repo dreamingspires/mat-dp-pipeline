@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 import dash_bootstrap_components as dbc
@@ -13,43 +14,90 @@ from mat_dp_pipeline.pipeline import LabelledOutput, PipelineOutput
 from mat_dp_pipeline.standard_data_format import Year
 
 
-def required_resources_fig(data: LabelledOutput) -> go.Figure:
-    resources = data.required_resources.reset_index()
-    resources["Tech"] = resources["Category"] + "/" + resources["Specific"]
-    resources = resources.drop(columns=["Category", "Specific"])
-    resources.set_index("Tech", inplace=True)
-    return px.bar(
-        resources, x=resources.columns, y=resources.index, labels={"value": "Quantity"}
-    )
+class EmissionsPlotter(ABC):
+    _data: PipelineOutput
+
+    def __init__(self, data: PipelineOutput):
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+
+    @abstractmethod
+    def __call__(self, country: str, indicator: str):
+        ...
 
 
-def emissions_by_tech_fig(data: LabelledOutput) -> go.Figure:
-    # TODO:
-    return required_resources_fig(data)
-
-
-def emissions_by_material_fig(data: LabelledOutput) -> go.Figure:
-    emissions = data.emissions.dropna().reset_index()
-    emissions["CO3"] = emissions["CO2"] * 2
-    print(emissions)
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            emissions,
-            x=["CO2", "CO3"],
-            y="Resource",
+class EmissionsByMaterialPlotter(EmissionsPlotter):
+    def __call__(self, country: str, indicator: str):
+        emissions = (
+            self.data.emissions(country, indicator)
+            .drop(columns=["Category", "Specific"])
+            .groupby("Year")
+            .sum()
+            .rename_axis("Resource", axis=1)
         )
-    )
-    fig.update_layout(scattermode="group")
-    fig.update_xaxes(type="category")
-    fig.update_yaxes(type="category")
-    return fig
+        return px.area(emissions, labels={"value": indicator})
+
+
+class EmissionsByTechPlotter(EmissionsPlotter):
+    def __call__(self, country: str, indicator: str):
+        emissions = self.data.emissions(country, indicator)
+        emissions["Tech"] = emissions["Category"] + "/" + emissions["Specific"]
+        # Emissions will be a data frame with index of Techs and columns Resources
+        # The values are individual emissions per given tech/resource
+        emissions = (
+            emissions.drop(columns=["Category", "Specific"])
+            .set_index("Tech")
+            .groupby("Tech")
+            .sum()
+            .drop(columns="Year")
+            .rename_axis("Resource", axis=1)
+        )
+        return px.bar(
+            emissions,
+            x=emissions.columns,
+            y=emissions.index,
+            labels={"value": indicator},
+        )
+
+
+class EmissionsByResourcesPlotter(EmissionsPlotter):
+    def __call__(self, country: str, indicator: str):
+        emissions = (
+            self.data.emissions(country, indicator)
+            .drop(columns=["Year", "Category", "Specific"])
+            .sum()
+            .to_frame(indicator)
+            .rename_axis("Resource", axis=0)
+            .reset_index()
+        )
+        return px.bar(emissions, x=indicator, y="Resource", color="Resource")
+
+
+def emissions_by_resources_fig(
+    data: PipelineOutput, country: str, indicator: str
+) -> go.Figure:
+    return EmissionsByResourcesPlotter(data)(country, indicator)
+
+
+def emissions_by_tech_fig(
+    data: PipelineOutput, country: str, indicator: str
+) -> go.Figure:
+    return EmissionsByTechPlotter(data)(country, indicator)
+
+
+def emissions_by_material_fig(
+    data: PipelineOutput, country: str, indicator: str
+) -> go.Figure:
+    return EmissionsByMaterialPlotter(data)(country, indicator)
 
 
 class App:
     dash_app: Dash
     outputs: PipelineOutput
-    selected_output: LabelledOutput | None
+    selected_outputs: dict[Year, LabelledOutput] | None
 
     def __init__(self, outputs: PipelineOutput):
         self.dash_app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -58,15 +106,27 @@ class App:
             Output("tab", "children"),
             Input("tabs", "active_tab"),
             Input("country", "value"),
-            Input("year", "value"),
+            Input("indicator", "value"),
         )
 
         self.outputs = outputs
-        assert len(self.outputs) == len(outputs), "Duplicated keys found!"
-        self.selected_output = None
+        # TODO: self.tabs with list of tuple[title, Plotter]
+        self.tabs = {
+            "emissions_by_material": (
+                "Emissions by material",
+                EmissionsByMaterialPlotter(outputs),
+            ),
+            "emissions_by_tech": ("Emissions by tech", EmissionsByTechPlotter(outputs)),
+            "emissions_by_resources": (
+                "Emissions by resources",
+                EmissionsByResourcesPlotter(outputs),
+            ),
+        }
+        self.selected_outputs = None
 
     def controls(self):
-        countries = sorted(set(self.outputs.keys(Path)))
+        countries = sorted(str(p) for p in set(self.outputs.keys(Path)))
+        indicators = ["CO2"]  # TODO:
         body = dbc.CardBody(
             [
                 html.Div(
@@ -74,7 +134,13 @@ class App:
                         html.Label("Country"),
                         dcc.Dropdown(countries, id="country"),
                     ]
-                )
+                ),
+                html.Div(
+                    [
+                        html.Label("Indicator"),
+                        dcc.Dropdown(indicators, id="indicator"),
+                    ]
+                ),
             ]
         )
 
@@ -84,21 +150,10 @@ class App:
         return [
             dbc.Tabs(
                 [
-                    dbc.Tab(
-                        label="Emissions by material",
-                        tab_id="emissions_by_material",
-                    ),
-                    dbc.Tab(
-                        label="Emissions by tech",
-                        tab_id="emissions_by_tech",
-                    ),
-                    dbc.Tab(
-                        label="Required resources",
-                        tab_id="required_resources",
-                    ),
+                    dbc.Tab(label=title, tab_id=tab_id)
+                    for tab_id, (title, _) in self.tabs.items()
                 ],
                 id="tabs",
-                active_tab="emissions_by_material",
             ),
             html.Div(id="tab"),
         ]
@@ -122,27 +177,19 @@ class App:
     def tab_layout(self, title: str, fig: go.Figure):
         return [html.H2(title), dcc.Graph(figure=fig)]
 
-    def render_graph_tab(self, tab, country, year):
-        self.selected_output = self.outputs[country, year]
-        if not self.selected_output:
+    def render_graph_tab(self, tab: str, country: str, indicator: str):
+        if not indicator:  # TODO: or country not in outputs
             raise PreventUpdate
 
-        if tab == "emissions_by_material":
-            fig = emissions_by_material_fig(self.selected_output)
-            return self.tab_layout("Emissions from material production", fig)
-        elif tab == "emissions_by_tech":
-            fig = emissions_by_tech_fig(self.selected_output)
-            return self.tab_layout("Emissions by technolgy", fig)
-        elif tab == "required_resources":
-            fig = required_resources_fig(self.selected_output)
-            return self.tab_layout("Required resources", fig)
+        title, plotter = self.tabs[tab]
+        return self.tab_layout(title, fig=plotter(country, indicator))
 
     def register_callback(self, fn, *spec):
         self.dash_app.callback(*spec)(fn)
 
     def serve(self):
         self.dash_app.layout = self.layout()
-        self.dash_app.run_server(debug=True)
+        self.dash_app.run_server()
 
 
 if __name__ == "__main__":

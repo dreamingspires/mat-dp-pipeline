@@ -2,3 +2,4 @@ Category,Specific,Description,Material Unit,Production Unit,Steel,Silicon,PVC
 Global,Tech1,bla bla bla,tonnes,km,1,2,3
 Power plant,Gas-country-override,,tonnes,MW,4,5,6
 NotOverriden,World,,tonnes,MW,6,7,8
+
