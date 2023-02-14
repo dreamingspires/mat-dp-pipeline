@@ -13,7 +13,6 @@ def emissions_by_material(
 ) -> go.Figure:
     emissions = (
         data.emissions(country, indicator)
-        .drop(columns=["Category", "Specific"])
         .groupby("Year")
         .sum()
         .rename_axis("Resource", axis=1)
@@ -22,17 +21,15 @@ def emissions_by_material(
 
 
 def emissions_by_tech(data: PipelineOutput, country: str, indicator: str) -> go.Figure:
-    emissions = data.emissions(country, indicator)
+    emissions = data.emissions(country, indicator).reset_index()
     emissions["Tech"] = emissions["Category"] + "/" + emissions["Specific"]
     # Emissions will be a data frame with index of Techs and columns Resources
     # The values are individual emissions per given tech/resource
     emissions = (
         emissions.drop(columns=["Category", "Specific"])
-        .set_index("Tech")
         .groupby("Tech")
         .sum()
         .drop(columns="Year")
-        .rename_axis("Resource", axis=1)
     )
     return px.bar(
         emissions,
@@ -47,10 +44,9 @@ def emissions_by_resources(
 ) -> go.Figure:
     emissions = (
         data.emissions(country, indicator)
-        .drop(columns=["Year", "Category", "Specific"])
+        .reset_index(drop=True)
         .sum()
         .to_frame(indicator)
-        .rename_axis("Resource", axis=0)
         .reset_index()
     )
     return px.bar(emissions, x=indicator, y="Resource", color="Resource")

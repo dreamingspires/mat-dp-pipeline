@@ -45,9 +45,8 @@ class PipelineOutput:
         """
         data = self[Path(key)]
         return pd.concat(
-            {k: v.emissions.loc[indicator] for k, v in data.items()},
-            names=["Year", "Category", "Specific"],
-        ).reset_index()
+            {k: v.emissions.loc[indicator, :] for k, v in data.items()}, names=["Year"]
+        )
 
     @property
     def by_year(self) -> dict[sdf.Year, dict[Path, LabelledOutput]]:
@@ -101,7 +100,7 @@ class PipelineOutput:
             return self.by_year[year][Path(path)]
 
     def __iter__(self) -> Iterator[LabelledOutput]:
-        for year, d in self.by_year.items():
+        for _, d in self.by_year.items():
             yield from d.values()
 
     def __len__(self) -> int:

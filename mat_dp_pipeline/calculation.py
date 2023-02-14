@@ -27,7 +27,7 @@ class ProcessedOutput:
 
 def calculate(inpt: ProcessableInput) -> ProcessedOutput:
     required_resources = inpt.intensities.mul(inpt.targets, axis="index").rename_axis(
-        index=["Category", "Specific"]
+        index=["Category", "Specific"], columns=["Resource"]
     )
     emissions_dict: dict[str, pd.DataFrame] = {
         str(indicator): required_resources.mul(inpt.indicators[indicator])
@@ -35,7 +35,6 @@ def calculate(inpt: ProcessableInput) -> ProcessedOutput:
     }
 
     # Move indicators to cols
-    emissions = pd.concat(emissions_dict)
-    emissions.index = emissions.index.set_names("Indicator", level=0)
+    emissions = pd.concat(emissions_dict, names=["Indicator"])
     assert isinstance(emissions, pd.DataFrame)
     return ProcessedOutput(required_resources=required_resources, emissions=emissions)
