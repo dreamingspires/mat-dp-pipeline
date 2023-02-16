@@ -24,10 +24,18 @@ class PipelineOutput:
     _by_year: dict[sdf.Year, dict[Path, LabelledOutput]]
     _by_path: dict[Path, dict[sdf.Year, LabelledOutput]]
     _length: int
+    _indicators: set[str]
 
     def __init__(self, data: list[LabelledOutput]):
         self._by_year = defaultdict(dict)
         self._by_path = defaultdict(dict)
+
+        if data:
+            # We know from the computation that each LabelledOutput has the same
+            # set of indicators, so we'll just take the first one
+            self._indicators = data[0].indicators
+        else:
+            self._indicators = set()
 
         for output in data:
             self._by_year[output.year][output.path] = output
@@ -62,6 +70,10 @@ class PipelineOutput:
             return self.by_year.keys()
         else:
             return self.by_path.keys()
+
+    @property
+    def indicators(self):
+        return self._indicators
 
     @overload
     def __getitem__(self, key: sdf.Year) -> dict[Path, LabelledOutput]:

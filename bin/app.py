@@ -48,7 +48,7 @@ class App:
 
     def controls(self):
         countries = sorted(str(p) for p in set(self.outputs.keys(Path)))
-        indicators = ["CO2"]  # TODO:
+        indicators = sorted(self.outputs.indicators)
         body = dbc.CardBody(
             [
                 html.Div(
@@ -103,7 +103,7 @@ class App:
 
         title, plotter = self._tab(tab_id)
         fig = plotter(self.outputs, country, indicator)
-        return [html.H2(title), dcc.Graph(figure=fig)]
+        return [html.H2(title), dcc.Graph(figure=fig, style={"height": "75vh"})]
 
     def register_callback(self, fn, *spec):
         self.dash_app.callback(*spec)(fn)
@@ -114,6 +114,8 @@ class App:
 
 
 if __name__ == "__main__":
-    path = Path(__file__).parent.parent / "test_data/World"
+    # path = Path(__file__).parent.parent / "test_data/World"
+    path = Path("/tmp/sdf/General")
     output = pipeline(path)
+    print("Processed.")
     App(output).serve()

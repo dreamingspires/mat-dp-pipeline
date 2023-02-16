@@ -187,25 +187,42 @@ def combined_to_processable_input(
     intensities = intensities.rename({sdf.Year(0): first_year})
     indicators = indicators.rename({sdf.Year(0): first_year})
 
-    tech_year_idx = pd.MultiIndex.from_tuples(
-        ((year, *tech) for year, tech in itertools.product(target_years, target_techs))
-    )
-    resource_year_idx = pd.MultiIndex.from_product([target_years, indicators_resources])
+    interpolate_intensities = len(intensities_years) != 1
+    if interpolate_intensities:
+        tech_year_idx = pd.MultiIndex.from_tuples(
+            (
+                (year, *tech)
+                for year, tech in itertools.product(target_years, target_techs)
+            )
+        )
+        intensities = (
+            intensities.reindex(tech_year_idx)
+            .unstack()
+            .unstack()  # Leave only year in the index
+            .interpolate(method="index")
+            .stack()  # type: ignore
+            .stack()
+        )
+    else:
+        # optimisation if no interpolation is needed, when we have just single year of intensities data
+        df = intensities.loc[first_year].reindex(target_techs)
+        intensities = pd.concat({year: df for year in target_years}, names=["Year"])
 
-    intensities: pd.DataFrame = (
-        intensities.reindex(tech_year_idx)
-        .unstack()
-        .unstack()  # Leave only year in the index
-        .interpolate(method="index")
-        .stack()  # type: ignore
-        .stack()
-    )
-    indicators: pd.DataFrame = (
-        indicators.reindex(resource_year_idx)
-        .unstack()  # Leave only year in the index
-        .interpolate(method="index")
-        .stack()  # type: ignore
-    )
+    interpolate_indicators = len(indicator_years) != 1
+    if interpolate_indicators:
+        resource_year_idx = pd.MultiIndex.from_product(
+            [target_years, indicators_resources]
+        )
+        indicators = (
+            indicators.reindex(resource_year_idx)
+            .unstack()  # Leave only year in the index
+            .interpolate(method="index")
+            .stack()  # type: ignore
+        )
+    else:
+        # optimisation if no interpolation is needed, when we have just single year of indicators data
+        df = indicators.loc[first_year].reindex(indicators_resources)
+        indicators = pd.concat({year: df for year in target_years}, names=["Year"])
 
     # ProcessableInput is for a given year, so we have to proces year by year in a loop
     # We only consider target years, starting from the second one.

@@ -12,7 +12,6 @@ class ProcessedOutput:
     emissions: pd.DataFrame
 
     @property
-    @cache
     def indicators(self) -> set[str]:
         """Get a set of indicators stored in `emissions`.
 
@@ -35,6 +34,8 @@ def calculate(inpt: ProcessableInput) -> ProcessedOutput:
     }
 
     # Move indicators to cols
-    emissions = pd.concat(emissions_dict, names=["Indicator"])
+    emissions = pd.concat(emissions_dict, names=["Indicator"]).rename_axis(
+        columns="Resource"
+    )
     assert isinstance(emissions, pd.DataFrame)
     return ProcessedOutput(required_resources=required_resources, emissions=emissions)
