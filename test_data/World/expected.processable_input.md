@@ -10,10 +10,11 @@ Power plant Gas-country-override  6.11     5.11   4.11
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -33,10 +34,11 @@ Power plant Gas-country-override  6.11     5.11   4.11
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -56,10 +58,11 @@ Power plant Gas-country-override  6.11     5.11   4.11
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -79,10 +82,11 @@ Power plant Gas-country-override  6.11     5.11   4.11
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -103,10 +107,11 @@ Power plant  Gas-country-override  6.12     5.12   4.12
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -128,10 +133,11 @@ Power plant  Gas-country-override  6.120000  5.120000  4.120000
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -153,10 +159,11 @@ Power plant  Gas-country-override  6.12     5.12   4.12
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets
@@ -178,10 +185,11 @@ Power plant  Gas-country-override  6.12     5.12   4.12
 
 ### Indicators
 ```
-          CO2
-PVC      40.0
-Silicon  30.0
-Steel    20.0
+           CO2
+Material      
+PVC       40.0
+Silicon   30.0
+Steel     20.0
 ```
 
 ### Targets

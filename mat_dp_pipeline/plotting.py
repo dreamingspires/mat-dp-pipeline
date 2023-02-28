@@ -71,6 +71,7 @@ def emissions_by_tech(data: PipelineOutput, country: str, indicator: str) -> go.
         x=emissions.columns,
         y=emissions.index,
         labels={"value": indicator},
+        color_discrete_sequence=px.colors.qualitative.Alphabet,
     )
     fig.update_layout(
         updatemenus=[x_log_switch()], yaxis={"categoryorder": "total ascending"}
@@ -92,6 +93,12 @@ def emissions_by_resources(
         .reset_index()
     )
 
-    fig = px.bar(emissions, x=indicator, y="Resource", color="Resource")
+    fig = px.bar(
+        emissions,
+        x=indicator,
+        y="Resource",
+        color="Resource",
+        color_discrete_sequence=px.colors.qualitative.Alphabet,
+    )
     fig.update_layout(updatemenus=[x_log_switch()])
     return fig

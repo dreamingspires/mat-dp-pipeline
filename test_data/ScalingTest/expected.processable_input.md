@@ -10,9 +10,10 @@ Tool Hammer    5.0   1.0
 
 ### Indicators
 ```
-        CO2   PM25
-Steel  20.0  100.0
-Wood    5.0   50.0
+           CO2   PM25
+Material             
+Steel     20.0  100.0
+Wood       5.0   50.0
 ```
 
 ### Targets
@@ -32,9 +33,10 @@ Tool Hammer    6.0   2.0
 
 ### Indicators
 ```
-        CO2   PM25
-Steel  20.0  100.0
-Wood    5.0   50.0
+           CO2   PM25
+Material             
+Steel     20.0  100.0
+Wood       5.0   50.0
 ```
 
 ### Targets
@@ -54,9 +56,10 @@ Tool Hammer   15.0  11.0
 
 ### Indicators
 ```
-        CO2   PM25
-Steel  20.0  100.0
-Wood    5.0   50.0
+           CO2   PM25
+Material             
+Steel     20.0  100.0
+Wood       5.0   50.0
 ```
 
 ### Targets

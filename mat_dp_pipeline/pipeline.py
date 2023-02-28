@@ -1,7 +1,8 @@
-from abc import ABC, abstractproperty
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+import tempfile
 from typing import Iterator, Optional, overload
 
 import pandas as pd
@@ -120,20 +121,43 @@ class PipelineOutput:
 
 
 class DataSource(ABC):
-    @abstractproperty
-    def sdf(self) -> sdf.StandardDataFormat:
+    @abstractmethod
+    def __call__(self, output_dir: Path) -> None:
+        """Prepare a Standard Data Format data and save it in the `output_dir`
+
+        Args:
+            output_dir (Path): Output SDF root directory
+        """
         ...
 
 
+@overload
+def pipeline(source: Path) -> PipelineOutput:
+    ...
+
+
+@overload
+def pipeline(source: DataSource, output_path: Path | None = None) -> PipelineOutput:
+    ...
+
+
 def pipeline(
-    input_data: DataSource | Path, output_sdf_dir: Optional[Path] = None
+    source: Path | DataSource | None = None,
+    output_path: Path | None = None,
 ) -> PipelineOutput:
-    if isinstance(input_data, Path):
-        out_sdf = sdf.load(input_data)
+
+    if isinstance(source, DataSource):
+        if output_path:
+            source(output_path)
+            out_sdf = sdf.load(Path(output_path))
+        else:
+            with tempfile.TemporaryDirectory() as dirpath:
+                source(Path(dirpath))
+                out_sdf = sdf.load(Path(dirpath))
     else:
-        out_sdf = input_data.sdf
-    if output_sdf_dir:
-        out_sdf.save(output_sdf_dir)
+        assert isinstance(source, Path)
+        out_sdf = sdf.load(source)
+
     processed = []
     for path, combined in sdf_to_combined_input(out_sdf):
         for path, year, inpt in combined_to_processable_input(path, combined):

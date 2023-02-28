@@ -39,3 +39,5 @@ def calculate(inpt: ProcessableInput) -> ProcessedOutput:
     )
     assert isinstance(emissions, pd.DataFrame)
     return ProcessedOutput(required_resources=required_resources, emissions=emissions)
+
+
