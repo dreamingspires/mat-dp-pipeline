@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
+import numpy as np
 import pandas as pd
 
 import mat_dp_pipeline.standard_data_format as sdf
@@ -158,6 +159,89 @@ def sdf_to_combined_input(
     yield from dfs(root_sdf, initial, Path(root_sdf.name))
 
 
+def _interpolate_intensities(
+    df: pd.DataFrame, years: list[sdf.Year], techs: list[tuple[str, str]]
+) -> pd.DataFrame:
+    df_index_names = df.index.names  # to restore later
+
+    idx = pd.MultiIndex.from_tuples(
+        ((year, *tech) for year, tech in itertools.product(years, techs))
+    ).sort_values()
+
+    df = df.sort_index(axis=0).sort_index(axis=1).reindex(idx)
+    interpolated_array = df.unstack((1, 2)).interpolate(method="index").values.flatten()
+
+    def get_permutation():
+        """Creates a permutation of indexes for conversion of `interpolated_array` to
+        the flatten format of the initial `df` array. It's a bit complicated, so... you'll
+        just have to trust me on this.
+        """
+        n_techs = len(techs)
+        n_resources = len(df.columns)
+        n_years = len(years)
+
+        x, y = np.divmod(np.arange(n_techs * n_years), n_techs)
+        n = (
+            np.remainder(np.arange(n_techs * n_resources * n_years), n_resources)
+            * n_techs
+        )
+        r = np.repeat(n_techs * n_resources * x + y, n_resources)
+        final = n + r
+        return final.astype(int)
+
+    ordering = get_permutation()
+    df = pd.DataFrame(
+        interpolated_array[ordering].reshape(-1, len(df.columns)),
+        index=df.index,
+        columns=df.columns,
+    )
+
+    # index names were lost, restoring it
+    df.index.names = df_index_names
+    return df
+
+
+def _interpolate_indicators(
+    df: pd.DataFrame, years: list[sdf.Year], resources: list[str]
+) -> pd.DataFrame:
+    df_index_names = df.index.names  # to restore later
+
+    idx = pd.MultiIndex.from_product([years, resources]).sort_values()
+
+    df = df.sort_index(axis=0).sort_index(axis=1).reindex(idx)
+    interpolated_array = df.unstack().interpolate(method="index").values.flatten()
+
+    def get_permutation():
+        """Creates a permutation of indexes for conversion of `interpolated_array` to
+        the flatten format of the initial `df` array. It's a bit complicated, so... you'll
+        just have to trust me on this.
+        """
+
+        n_resources = len(resources)
+        n_indicators = len(df.columns)
+        n_years = len(years)
+
+        x, y = np.divmod(np.arange(n_resources * n_years), n_resources)
+        n = (
+            np.remainder(np.arange(n_resources * n_indicators * n_years), n_indicators)
+            * n_resources
+        )
+        r = np.repeat(n_resources * n_indicators * x + y, n_indicators)
+        final = n + r
+        return final.astype(int)
+
+    ordering = get_permutation()
+    df = pd.DataFrame(
+        interpolated_array[ordering].reshape(-1, len(df.columns)),
+        index=df.index,
+        columns=df.columns,
+    )
+
+    # index names were lost, restoring it
+    df.index.names = df_index_names
+    return df
+
+
 def combined_to_processable_input(
     path: Path, combined: CombinedInput
 ) -> Iterator[tuple[Path, sdf.Year, ProcessableInput]]:
@@ -187,42 +271,8 @@ def combined_to_processable_input(
     intensities = intensities.rename({sdf.Year(0): first_year})
     indicators = indicators.rename({sdf.Year(0): first_year})
 
-    interpolate_intensities = len(intensities_years) != 1
-    if interpolate_intensities:
-        tech_year_idx = pd.MultiIndex.from_tuples(
-            (
-                (year, *tech)
-                for year, tech in itertools.product(target_years, target_techs)
-            )
-        )
-        intensities = (
-            intensities.reindex(tech_year_idx)
-            .unstack()
-            .unstack()  # Leave only year in the index
-            .interpolate(method="index")
-            .stack()  # type: ignore
-            .stack()
-        )
-    else:
-        # optimisation if no interpolation is needed, when we have just single year of intensities data
-        df = intensities.loc[first_year].reindex(target_techs)
-        intensities = pd.concat({year: df for year in target_years}, names=["Year"])
-
-    interpolate_indicators = len(indicator_years) != 1
-    if interpolate_indicators:
-        resource_year_idx = pd.MultiIndex.from_product(
-            [target_years, indicators_resources]
-        )
-        indicators = (
-            indicators.reindex(resource_year_idx)
-            .unstack()  # Leave only year in the index
-            .interpolate(method="index")
-            .stack()  # type: ignore
-        )
-    else:
-        # optimisation if no interpolation is needed, when we have just single year of indicators data
-        df = indicators.loc[first_year].reindex(indicators_resources)
-        indicators = pd.concat({year: df for year in target_years}, names=["Year"])
+    intesities = _interpolate_intensities(intensities, target_years, target_techs)
+    indicators = _interpolate_indicators(indicators, target_years, indicators_resources)
 
     # ProcessableInput is for a given year, so we have to proces year by year in a loop
     # We only consider target years, starting from the second one.
