@@ -23,6 +23,8 @@ PARAMETER_TO_CATEGORY = {
     "Power Generation (Aggregate)": "Power plant",
 }
 
+# TODO: keep the intersection of data between the sheets. Warn if any discrepancies
+
 
 def default_location_mapping() -> dict[str, Path]:
     countries = pd.read_csv(COUNTRY_MAPPING_CSV)
@@ -130,7 +132,7 @@ class MatDpDB(DataSource):
         df.insert(3, "Material Unit", units.iloc[:, 0])
 
         # Drop NaN based on resource value columns only
-        df = df.dropna(subset=df.columns[6:])
+        # df = df.dropna(subset=df.columns[6:])
         for location, intensities in df.groupby("Location"):
             yield str(location), intensities.drop(columns=["Location"])
 
@@ -146,7 +148,7 @@ class MatDpDB(DataSource):
                 ]
             )
             .rename(columns={"Material code": "Material"})
-            .dropna()
+            # .dropna()
         )
 
     def _targets(self) -> Iterator[tuple[str, pd.DataFrame]]:
@@ -155,7 +157,7 @@ class MatDpDB(DataSource):
             targets.drop(targets[targets["parameter"] != self._targets_parameter].index)
             .drop(columns=[targets.columns[0], "scenario", "parameter"])
             .rename(columns={"variable": "Specific"})
-            .dropna()
+            # .dropna()
         )
         targets.insert(
             0, "Category", self._parameter_to_category[self._targets_parameter]
