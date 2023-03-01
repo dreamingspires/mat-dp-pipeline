@@ -271,7 +271,7 @@ def combined_to_processable_input(
     intensities = intensities.rename({sdf.Year(0): first_year})
     indicators = indicators.rename({sdf.Year(0): first_year})
 
-    intesities = _interpolate_intensities(intensities, target_years, target_techs)
+    intensities = _interpolate_intensities(intensities, target_years, target_techs)
     indicators = _interpolate_indicators(indicators, target_years, indicators_resources)
 
     # ProcessableInput is for a given year, so we have to proces year by year in a loop
