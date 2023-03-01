@@ -13,7 +13,7 @@ Tech     L0          0.0
 ### Indicators
 ```
           CO2
-Material     
+Resource     
 Cement    2.0
 Coal      1.0
 Steel     3.0
@@ -40,7 +40,7 @@ Tech     L0          0.0
 ### Indicators
 ```
           CO2
-Material     
+Resource     
 Cement    2.0
 Coal      1.0
 Steel     3.0

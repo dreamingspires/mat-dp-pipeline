@@ -1,4 +1,5 @@
 import itertools
+import logging
 from pathlib import Path
 from typing import Iterator
 
@@ -102,7 +103,7 @@ class MatDpDB(DataSource):
         else:
             self._location_mapping = default_location_mapping()
 
-    def _intensities(self) -> Iterator[tuple[str, pd.DataFrame]]:
+    def _raw_intensities(self) -> pd.DataFrame:
         df = (
             pd.read_excel(
                 self._materials_spreadsheet,
@@ -130,7 +131,9 @@ class MatDpDB(DataSource):
         df.pop("Units")
         df.insert(3, "Production Unit", units.iloc[:, 1])
         df.insert(3, "Material Unit", units.iloc[:, 0])
+        return df
 
+    def _iter_intensities(self, df: pd.DataFrame) -> Iterator[tuple[str, pd.DataFrame]]:
         # Drop NaN based on resource value columns only
         # df = df.dropna(subset=df.columns[6:])
         for location, intensities in df.groupby("Location"):
@@ -147,22 +150,22 @@ class MatDpDB(DataSource):
                     "Notes",
                 ]
             )
-            .rename(columns={"Material code": "Material"})
-            # .dropna()
+            .rename(columns={"Material code": "Resource"})
+            .dropna()
         )
 
-    def _targets(self) -> Iterator[tuple[str, pd.DataFrame]]:
+    def _iter_targets(self) -> Iterator[tuple[str, pd.DataFrame]]:
         targets = pd.read_csv(self._targets_csv)
         targets = (
             targets.drop(targets[targets["parameter"] != self._targets_parameter].index)
             .drop(columns=[targets.columns[0], "scenario", "parameter"])
             .rename(columns={"variable": "Specific"})
-            # .dropna()
+            .dropna()
         )
         targets.insert(
             0, "Category", self._parameter_to_category[self._targets_parameter]
         )
-        for pattern, replacement in self._parameter_to_category.items():
+        for pattern, replacement in self._variable_to_specific.items():
             # Remove (ignore) if None replacement, else replace
             if replacement is None:
                 targets = targets[targets["Specific"] != pattern]
@@ -179,12 +182,35 @@ class MatDpDB(DataSource):
         return self._location_mapping.get(location, Path("Unknown") / location)
 
     def __call__(self, output_dir: Path) -> None:
+        intensities = self._raw_intensities()
+        indicators = self._indicators()
+
+        indicators_resources = set(indicators["Resource"].unique())
+        intensities_resources = set(intensities.columns[6:])
+        resources = sorted(indicators_resources & intensities_resources)
+        if diff := indicators_resources - intensities_resources:
+            logging.warning(
+                f"The following resources found in indicators, but not in intensities. Ignoring them. {diff}"
+            )
+        if diff := intensities_resources - indicators_resources:
+            logging.warning(
+                f"The following resources found in intesities, but not in indicators. Ignoring them. {diff}"
+            )
+
+        # trim resources in intensities and indicators
+        intensities = intensities.reindex(
+            columns=intensities.columns[:6].to_list() + resources
+        )
+        indicators = (
+            indicators.set_index("Resource", drop=True).reindex(resources).reset_index()
+        )
+
         for file_name, (location, df) in itertools.chain(
-            zip(itertools.repeat("techs.csv"), self._intensities()),
-            zip(itertools.repeat("targets.csv"), self._targets()),
+            zip(itertools.repeat("techs.csv"), self._iter_intensities(intensities)),
+            zip(itertools.repeat("targets.csv"), self._iter_targets()),
         ):
             location_dir = output_dir / self._location_to_path(location)
             location_dir.mkdir(exist_ok=True, parents=True)
             df.to_csv(location_dir / file_name, index=False)
 
-        self._indicators().to_csv(output_dir / "indicators.csv", index=False)
+        indicators.to_csv(output_dir / "indicators.csv", index=False)

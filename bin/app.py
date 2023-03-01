@@ -6,6 +6,7 @@ from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 
 from mat_dp_pipeline import pipeline
+from mat_dp_pipeline.data_sources.mat_dp_db import MatDpDB
 from mat_dp_pipeline.pipeline import LabelledOutput, PipelineOutput
 from mat_dp_pipeline.plotting import (
     EmissionsPlotter,
@@ -115,7 +116,12 @@ class App:
 
 if __name__ == "__main__":
     # path = Path(__file__).parent.parent / "test_data/World"
-    path = Path("/tmp/sdf/General")
-    output = pipeline(path)
+    # path = Path("/tmp/sdf/General")
+    MATERIALS_EXCEL = "scratch/Material_intensities_database.xlsx"
+    TARGETS_CSV = "scratch/results_1.5deg.csv"
+    TARGETS_PARAMETER = "Power Generation (Aggregate)"
+
+    ds = MatDpDB(Path(MATERIALS_EXCEL), Path(TARGETS_CSV), TARGETS_PARAMETER)
+    output = pipeline(ds)
     print("Processed.")
     App(output).serve()

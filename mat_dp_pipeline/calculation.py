@@ -47,14 +47,5 @@ def calculate(inpt: ProcessableInput) -> ProcessedOutput:
         columns=inpt.intensities.columns,
     ).rename_axis(columns="Resource")
 
-    # emissions_dict: dict[str, pd.DataFrame] = {
-    #     str(indicator): required_resources.mul(inpt.indicators[indicator])
-    #     for indicator in inpt.indicators.columns
-    # }
-
-    # Move indicators to cols
-    # emissions = pd.concat(emissions_dict, names=["Indicator"]).rename_axis(
-    #     columns="Resource"
-    # )
     assert isinstance(emissions, pd.DataFrame)
     return ProcessedOutput(required_resources=required_resources, emissions=emissions)

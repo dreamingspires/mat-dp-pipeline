@@ -2,6 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -74,8 +75,8 @@ class IndicatorsReader(InputReader):
     def read(self, path: FileOrPath) -> pd.DataFrame:
         return pd.read_csv(
             path,
-            index_col="Material",
-            dtype=defaultdict(np.float64, {"Material": str}),
+            index_col="Resource",
+            dtype=defaultdict(np.float64, {"Resource": str}),
         )
 
 
@@ -132,7 +133,7 @@ def load(input_dir: Path) -> StandardDataFormat:
     intensities_reader = IntensitiesReader()
     indicators_reader = IndicatorsReader()
 
-    def dfs(root: Path) -> StandardDataFormat:
+    def dfs(root: Path) -> StandardDataFormat | None:
         sub_directories = list(filter(lambda p: p.is_dir(), root.iterdir()))
 
         intensities = None
@@ -166,7 +167,9 @@ def load(input_dir: Path) -> StandardDataFormat:
                 targets = targets_reader.read(file)
 
         for sub_directory in sub_directories:
-            children[sub_directory.name] = dfs(sub_directory)
+            leaf = dfs(sub_directory)
+            if leaf is not None:
+                children[sub_directory.name] = leaf
 
         # If not intensities or indicators were provided, use empty ones
         if intensities is None:
@@ -178,14 +181,21 @@ def load(input_dir: Path) -> StandardDataFormat:
             assert not indicators, "No base indicators, while yearly files provided!"
             indicators = pd.DataFrame()
 
-        return StandardDataFormat(
-            name=root.name,
-            intensities=intensities,
-            intensities_yearly=intensities_yearly,
-            indicators=indicators,
-            indicators_yearly=indicators_yearly,
-            targets=targets,
-            children=children,
-        )
+        # Ignore leaves with no targets specified
+        if targets is None and not sub_directories:
+            logging.warning(f"No targets found in {root.name}. Ignoring.")
+            return
+        else:
+            return StandardDataFormat(
+                name=root.name,
+                intensities=intensities,
+                intensities_yearly=intensities_yearly,
+                indicators=indicators,
+                indicators_yearly=indicators_yearly,
+                targets=targets,
+                children=children,
+            )
 
-    return dfs(input_dir)
+    root_dfs = dfs(input_dir)
+    assert root_dfs is not None
+    return root_dfs
