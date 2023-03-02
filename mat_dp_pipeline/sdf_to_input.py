@@ -9,7 +9,7 @@ import pandas as pd
 import mat_dp_pipeline.standard_data_format as sdf
 
 
-@dataclass
+@dataclass(eq=False, order=False)
 class CombinedInput:
     """Input combined from hierachical structure. This is *not* year-level input.
 
@@ -49,7 +49,7 @@ class CombinedInput:
         return True
 
 
-@dataclass
+@dataclass(eq=False, order=False)
 class ProcessableInput:
     """Single processable input. The frames in processable input do not contain year
     dimension. This is the lowest level structure, ready for processing.
@@ -280,9 +280,9 @@ def combined_to_processable_input(
     assert isinstance(indicators, pd.DataFrame)
     for year in target_years:
         inpt = ProcessableInput(
-            intensities=intensities.loc[year, :].sort_index(),
-            targets=targets.loc[:, str(year)].sort_index(),
-            indicators=indicators.loc[year, :].sort_index(),
+            intensities=intensities.loc[year, :],  # .sort_index(),
+            targets=targets.loc[:, str(year)],  # .sort_index(),
+            indicators=indicators.loc[year, :],  # .sort_index(),
         )
         yield path, year, inpt
 

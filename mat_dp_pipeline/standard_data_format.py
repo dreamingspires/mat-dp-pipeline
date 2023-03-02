@@ -1,8 +1,8 @@
+import logging
 import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-import logging
 from pathlib import Path
 
 import numpy as np

@@ -1,7 +1,7 @@
 from typing import Callable
 
 import numpy as np
-
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -99,6 +99,34 @@ def emissions_by_resources(
         y="Resource",
         color="Resource",
         color_discrete_sequence=px.colors.qualitative.Alphabet,
+    )
+    fig.update_layout(updatemenus=[x_log_switch()])
+    return fig
+
+
+def materials_production(data: PipelineOutput, country: str) -> go.Figure:
+    materials = (
+        data.resources(country).groupby("Year").sum().reset_index().set_index("Year")
+    )
+    materials = materials.loc[:, (materials != 0).any(axis=0)]
+    fig = px.area(materials, labels={"value": "Kg"})  # TODO: !!!! UNITS!!!
+    return fig
+
+
+def materials_by_tech(data: PipelineOutput, country: str) -> go.Figure:
+    materials = data.resources(country).reset_index()
+    materials["Tech"] = materials["Category"] + "/" + materials["Specific"]
+    materials = materials.drop(columns=["Category", "Specific"])
+    materials = materials.set_index("Year").groupby("Tech").sum()
+    materials = materials.loc[:, (materials != 0).any(axis=0)]
+    materials = materials.loc[~(materials == 0).all(axis=1)]
+
+    fig = px.bar(
+        materials,
+        x=materials.columns,
+        y=materials.index,
+        color_discrete_sequence=px.colors.qualitative.Alphabet,
+        labels={"value": "Kg"},  # TODO: !!!! UNITS!!!
     )
     fig.update_layout(updatemenus=[x_log_switch()])
     return fig

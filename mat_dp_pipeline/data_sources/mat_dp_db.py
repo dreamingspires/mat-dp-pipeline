@@ -5,8 +5,8 @@ from typing import Iterator
 
 import pandas as pd
 
-from mat_dp_pipeline.pipeline import DataSource
 import mat_dp_pipeline.standard_data_format as sdf
+from mat_dp_pipeline.pipeline import DataSource
 
 COUNTRY_MAPPING_CSV = Path(__file__).parent / "country_codes.csv"
 
@@ -23,8 +23,6 @@ VARIABLE_TO_SPECIFIC: dict[str, str | None] = {
 PARAMETER_TO_CATEGORY = {
     "Power Generation (Aggregate)": "Power plant",
 }
-
-# TODO: keep the intersection of data between the sheets. Warn if any discrepancies
 
 
 def default_location_mapping() -> dict[str, Path]:
@@ -72,7 +70,6 @@ def empty_sdf(name: str) -> sdf.StandardDataFormat:
 
 
 class MatDpDB(DataSource):
-
     _materials_spreadsheet: Path
     _targets_csv: Path
     _targets_parameter: str
@@ -134,7 +131,7 @@ class MatDpDB(DataSource):
         return df
 
     def _iter_intensities(self, df: pd.DataFrame) -> Iterator[tuple[str, pd.DataFrame]]:
-        # Drop NaN based on resource value columns only
+        ## Drop NaN based on resource value columns only
         # df = df.dropna(subset=df.columns[6:])
         for location, intensities in df.groupby("Location"):
             yield str(location), intensities.drop(columns=["Location"])

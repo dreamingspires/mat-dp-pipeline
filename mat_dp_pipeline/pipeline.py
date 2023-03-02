@@ -1,9 +1,9 @@
+import tempfile
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-import tempfile
-from typing import Iterator, Optional, overload
+from typing import Iterator, overload
 
 import pandas as pd
 
@@ -55,6 +55,12 @@ class PipelineOutput:
         data = self[Path(key)]
         return pd.concat(
             {k: v.emissions.loc[indicator, :] for k, v in data.items()}, names=["Year"]
+        )
+
+    def resources(self, key: Path | str) -> pd.DataFrame:
+        data = self[Path(key)]
+        return pd.concat(
+            {k: v.required_resources for k, v in data.items()}, names=["Year"]
         )
 
     @property
@@ -145,7 +151,6 @@ def pipeline(
     source: Path | DataSource | None = None,
     output_path: Path | None = None,
 ) -> PipelineOutput:
-
     if isinstance(source, DataSource):
         if output_path:
             source(output_path)

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import itertools
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -7,7 +7,7 @@ import pandas as pd
 from mat_dp_pipeline.sdf_to_input import ProcessableInput
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=False, eq=False)
 class ProcessedOutput:
     required_resources: pd.DataFrame
     emissions: pd.DataFrame
