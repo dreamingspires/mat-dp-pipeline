@@ -22,31 +22,31 @@ class CombinedInput:
             intensities' keys
         indicators (DataFrame): (Year, Resource) x (Indicator1, Indicator2, ..., IndicatorM)
             There should be exactly N resources, matching columns in intensities frame
+        tech_meta (DataFrame): Technologies metadata
     """
 
     intensities: pd.DataFrame
     targets: pd.DataFrame
     indicators: pd.DataFrame
+    tech_meta: pd.DataFrame
 
     def copy(self) -> "CombinedInput":
         return CombinedInput(
             intensities=self.intensities.copy(),
             targets=self.targets.copy(),
             indicators=self.indicators.copy(),
+            tech_meta=self.tech_meta.copy(),
         )
 
-    def validate(self) -> bool:
+    def validate(self) -> None:
         """Validates whether an object represents a valid instance of
         CombinedInput.
-
-        Returns:
-            bool: True if valid, False otherwise
 
         Raises:
             ValueError: when validation fails
         """
-        # TODO:
-        return True
+        sdf.validate_tech_units(self.tech_meta)
+        # TODO: more validation
 
 
 @dataclass(eq=False, order=False)
@@ -139,6 +139,14 @@ def sdf_to_combined_input(
         overlayed.indicators = overlay_in_order(
             overlayed.indicators, root.indicators, root.indicators_yearly
         )
+        if overlayed.tech_meta.empty:
+            overlayed.tech_meta = root.tech_meta
+        else:
+            overlayed.tech_meta = (
+                pd.concat([overlayed.tech_meta, root.tech_meta])
+                .groupby(level=(0, 1))
+                .last()
+            )
 
         # Go down in the hierarchy
         for name, directory in root.children.items():
@@ -148,13 +156,17 @@ def sdf_to_combined_input(
         if not root.children:
             assert root.targets is not None
             overlayed.targets = root.targets
-            assert overlayed.validate()
+            # Trim tech_meta to the techs specified in targets
+            # TODO: problem here
+            overlayed.tech_meta = overlayed.tech_meta.reindex(overlayed.targets.index)
+            overlayed.validate()
             yield label, overlayed
 
     initial = CombinedInput(
         intensities=pd.DataFrame(),
         targets=pd.DataFrame(),
         indicators=pd.DataFrame(),
+        tech_meta=pd.DataFrame(),
     )
     yield from dfs(root_sdf, initial, Path(root_sdf.name))
 

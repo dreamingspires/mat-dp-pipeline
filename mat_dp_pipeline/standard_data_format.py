@@ -13,6 +13,24 @@ from mat_dp_pipeline.common import FileOrPath
 Year = int
 
 
+def validate(condition: bool, error_message: str | None = None):
+    if not condition:
+        raise ValueError(error_message)
+
+
+def validate_tech_units(tech_meta: pd.DataFrame):
+    if tech_meta.empty:
+        return
+    validate(
+        (tech_meta.loc[:, "Material Unit"].groupby(level=0).nunique() == 1).all(),
+        "There are tech categories with non-unique Material Unit!",
+    )
+    validate(
+        (tech_meta.loc[:, "Production Unit"].groupby(level=0).nunique() == 1).all(),
+        "There are tech categories with non-unique Production Unit!",
+    )
+
+
 class InputReader(ABC):
     @property
     @abstractmethod
@@ -30,21 +48,17 @@ class IntensitiesReader(InputReader):
         return re.compile(r"techs_?([0-9]{4})?.csv")
 
     def read(self, path: FileOrPath) -> pd.DataFrame:
-        def col_filter(c):
-            # TODO: add this back in later!!!
-            return c not in ("Description", "Material Unit", "Production Unit")
-
+        str_cols = [
+            "Category",
+            "Specific",
+            "Description",
+            "Material Unit",
+            "Production Unit",
+        ]
         return pd.read_csv(
             path,
             index_col=["Category", "Specific"],
-            usecols=col_filter,
-            dtype=defaultdict(
-                np.float64,
-                {
-                    "Category": str,
-                    "Specific": str,
-                },
-            ),
+            dtype=defaultdict(np.float64, {c: str for c in str_cols}),
         )
 
 
@@ -93,6 +107,8 @@ class StandardDataFormat:
     targets: pd.DataFrame | None
     children: dict[str, "StandardDataFormat"]
 
+    tech_meta: pd.DataFrame
+
     def __post_init__(self):
         self.validate()
 
@@ -100,10 +116,28 @@ class StandardDataFormat:
         return self.targets is not None
 
     def validate(self) -> None:
-        if (self.targets is None) == (not self.children):
-            raise ValueError(
-                "SDF must either have children in the hierarchy or defined targets (leaf level)"
-            )
+        def has(item) -> bool:
+            return item is not None
+
+        validate(
+            has(self.targets) != (len(self.children) > 0),
+            "SDF must either have children in the hierarchy or defined targets (leaf level)",
+        )
+        validate(
+            has(self.intensities) or not has(self.intensities_yearly),
+            "No base intensities, while yearly files provided!",
+        )
+        validate(
+            has(self.indicators) or not has(self.indicators_yearly),
+            "No base indicators, while yearly files provided!",
+        )
+        try:
+            validate_tech_units(self.tech_meta)
+        except ValueError as e:
+            # This isn't a problem just yet - it's possible that the ones with
+            # more than one distinct unit won't be in the targets. It won't bother
+            # us then. Just warn for now. We'll validate again for the calculation.
+            logging.warning(e)
 
     def save(self, output_dir: Path) -> None:
         assert output_dir.is_dir()
@@ -172,20 +206,28 @@ def load(input_dir: Path) -> StandardDataFormat:
                 children[sub_directory.name] = leaf
 
         # If not intensities or indicators were provided, use empty ones
-        if intensities is None:
-            assert (
-                not intensities_yearly
-            ), "No base intensities, while yearly files provided!"
-            intensities = pd.DataFrame()
-        if indicators is None:
-            assert not indicators, "No base indicators, while yearly files provided!"
-            indicators = pd.DataFrame()
+        intensities = pd.DataFrame() if intensities is None else intensities
+        indicators = pd.DataFrame() if indicators is None else indicators
 
         # Ignore leaves with no targets specified
         if targets is None and not sub_directories:
             logging.warning(f"No targets found in {root.name}. Ignoring.")
             return
         else:
+            # *Move* metadata from all intensity frames into tech_meta
+            tech_meta_cols = ["Description", "Material Unit", "Production Unit"]
+            all_intensities = list(intensities_yearly.values()) + [intensities]
+            all_meta = [
+                i.loc[:, tech_meta_cols] for i in all_intensities if not i.empty
+            ]
+            if all_meta:
+                tech_meta = pd.concat(all_meta).groupby(level=(0, 1)).last()
+            else:
+                tech_meta = pd.DataFrame()
+
+            for inten in filter(lambda df: not df.empty, all_intensities):
+                inten.drop(columns=tech_meta_cols, inplace=True)
+
             return StandardDataFormat(
                 name=root.name,
                 intensities=intensities,
@@ -194,6 +236,7 @@ def load(input_dir: Path) -> StandardDataFormat:
                 indicators_yearly=indicators_yearly,
                 targets=targets,
                 children=children,
+                tech_meta=tech_meta,
             )
 
     root_dfs = dfs(input_dir)

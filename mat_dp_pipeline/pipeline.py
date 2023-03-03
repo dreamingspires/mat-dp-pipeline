@@ -26,10 +26,12 @@ class PipelineOutput:
     _by_path: dict[Path, dict[sdf.Year, LabelledOutput]]
     _length: int
     _indicators: set[str]
+    _tech_meta: pd.DataFrame
 
-    def __init__(self, data: list[LabelledOutput]):
+    def __init__(self, data: list[LabelledOutput], tech_meta: pd.DataFrame):
         self._by_year = defaultdict(dict)
         self._by_path = defaultdict(dict)
+        self._tech_meta = tech_meta
 
         if data:
             # We know from the computation that each LabelledOutput has the same
@@ -81,6 +83,10 @@ class PipelineOutput:
     @property
     def indicators(self):
         return self._indicators
+
+    @property
+    def tech_meta(self):
+        return self._tech_meta
 
     @overload
     def __getitem__(self, key: sdf.Year) -> dict[Path, LabelledOutput]:
@@ -164,7 +170,11 @@ def pipeline(
         out_sdf = sdf.load(source)
 
     processed = []
+    tech_meta = pd.DataFrame()
     for path, combined in sdf_to_combined_input(out_sdf):
+        tech_meta = (
+            pd.concat([combined.tech_meta, tech_meta]).groupby(level=(0, 1)).last()
+        )
         for path, year, inpt in combined_to_processable_input(path, combined):
             result = calculate(inpt)
             processed.append(
@@ -175,4 +185,4 @@ def pipeline(
                     path=path,
                 )
             )
-    return PipelineOutput(processed)
+    return PipelineOutput(processed, tech_meta)

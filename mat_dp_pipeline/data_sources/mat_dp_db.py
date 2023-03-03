@@ -57,18 +57,6 @@ def default_location_mapping() -> dict[str, Path]:
     return by_col("alpha-2") | by_col("name") | by_col("alpha-3") | from_matdp_region
 
 
-def empty_sdf(name: str) -> sdf.StandardDataFormat:
-    return sdf.StandardDataFormat(
-        name=name,
-        intensities=pd.DataFrame(),
-        intensities_yearly={},
-        indicators=pd.DataFrame(),
-        indicators_yearly={},
-        targets=None,
-        children={},
-    )
-
-
 class MatDpDB(DataSource):
     _materials_spreadsheet: Path
     _targets_csv: Path

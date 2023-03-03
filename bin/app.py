@@ -20,7 +20,6 @@ from mat_dp_pipeline.standard_data_format import Year
 class App:
     dash_app: Dash
     outputs: PipelineOutput
-    selected_outputs: dict[Year, LabelledOutput] | None
 
     def __init__(self, outputs: PipelineOutput):
         self.dash_app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -41,7 +40,6 @@ class App:
                 emissions_by_resources,
             ),
         ]
-        self.selected_outputs = None
 
     def _tab(self, tab_id: str) -> tuple[str, EmissionsPlotter]:
         # tab_id's are strings "0", "1", ...
