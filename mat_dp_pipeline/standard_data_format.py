@@ -59,6 +59,7 @@ class IntensitiesReader(InputReader):
             path,
             index_col=["Category", "Specific"],
             dtype=defaultdict(np.float64, {c: str for c in str_cols}),
+            na_values={c: "" for c in str_cols},
         )
 
 

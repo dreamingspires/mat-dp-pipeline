@@ -1,13 +1,14 @@
 from typing import Callable
 
 import numpy as np
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
 from mat_dp_pipeline.pipeline import PipelineOutput
+from mat_dp_pipeline.standard_data_format import Year
 
-EmissionsPlotter = Callable[[PipelineOutput, str, str], go.Figure]
+IndicatorPlotter = Callable[[PipelineOutput, str, str], go.Figure]
+RequiredResourcesPlotter = Callable[[PipelineOutput, str], go.Figure]
 
 
 def x_log_switch():
@@ -15,7 +16,7 @@ def x_log_switch():
     return dict(
         type="buttons",
         direction="right",
-        x=0.1,
+        x=0.7,
         y=1.1,
         buttons=[
             dict(
@@ -32,7 +33,7 @@ def x_log_switch():
     )
 
 
-def emissions_by_material(
+def indicator_by_resource_over_years(
     data: PipelineOutput, country: str, indicator: str
 ) -> go.Figure:
     emissions = (
@@ -52,10 +53,16 @@ def emissions_by_material(
         color_discrete_sequence=px.colors.qualitative.Alphabet,
     )
     fig.update_traces(hovertemplate="%{x}: %{y}")
+    fig.update_layout(
+        title="Emissions from material production",
+        title_font_size=24,
+    )
     return fig
 
 
-def emissions_by_tech(data: PipelineOutput, country: str, indicator: str) -> go.Figure:
+def indicator_by_tech_agg(
+    data: PipelineOutput, country: str, indicator: str
+) -> go.Figure:
     emissions = data.emissions(country, indicator).dropna(how="all").reset_index()
     emissions["Tech"] = emissions["Category"] + "/" + emissions["Specific"]
     # Emissions will be a data frame with index of Techs and columns Resources
@@ -73,13 +80,17 @@ def emissions_by_tech(data: PipelineOutput, country: str, indicator: str) -> go.
         labels={"value": indicator},
         color_discrete_sequence=px.colors.qualitative.Alphabet,
     )
+    years = sorted(data.keys(Year))
     fig.update_layout(
-        updatemenus=[x_log_switch()], yaxis={"categoryorder": "total ascending"}
+        title=f"Emissions by technology ({years[0]}-{years[-1]})",
+        title_font_size=24,
+        updatemenus=[x_log_switch()],
+        yaxis={"categoryorder": "total ascending"},
     )
     return fig
 
 
-def emissions_by_resources(
+def indicator_by_resource_agg(
     data: PipelineOutput, country: str, indicator: str
 ) -> go.Figure:
     emissions = (
@@ -100,20 +111,27 @@ def emissions_by_resources(
         color="Resource",
         color_discrete_sequence=px.colors.qualitative.Alphabet,
     )
-    fig.update_layout(updatemenus=[x_log_switch()])
+    years = sorted(data.keys(Year))
+    fig.update_layout(
+        title=f"Emissions by technology ({years[0]}-{years[-1]})",
+        title_font_size=24,
+        updatemenus=[x_log_switch()],
+    )
     return fig
 
 
-def materials_production(data: PipelineOutput, country: str) -> go.Figure:
+def required_resources_over_years(data: PipelineOutput, country: str) -> go.Figure:
     materials = (
         data.resources(country).groupby("Year").sum().reset_index().set_index("Year")
     )
     materials = materials.loc[:, (materials != 0).any(axis=0)]
     fig = px.area(materials, labels={"value": "Kg"})  # TODO: !!!! UNITS!!!
+    fig.update_traces(hovertemplate="%{x}: %{y}")
+    fig.update_layout(title="Required resources", title_font_size=24)
     return fig
 
 
-def materials_by_tech(data: PipelineOutput, country: str) -> go.Figure:
+def required_resources_by_tech_agg(data: PipelineOutput, country: str) -> go.Figure:
     materials = data.resources(country).reset_index()
     materials["Tech"] = materials["Category"] + "/" + materials["Specific"]
     materials = materials.drop(columns=["Category", "Specific"])
@@ -128,5 +146,31 @@ def materials_by_tech(data: PipelineOutput, country: str) -> go.Figure:
         color_discrete_sequence=px.colors.qualitative.Alphabet,
         labels={"value": "Kg"},  # TODO: !!!! UNITS!!!
     )
-    fig.update_layout(updatemenus=[x_log_switch()])
+    years = sorted(data.keys(Year))
+    fig.update_layout(
+        title=f"Materials production by technology ({years[0]}-{years[-1]})",
+        title_font_size=24,
+        updatemenus=[x_log_switch()],
+        yaxis={"categoryorder": "total ascending"},
+    )
+    return fig
+
+
+def required_resources_agg(data: PipelineOutput, country: str):
+    materials = data.resources(country).sum()
+    materials = materials[materials > 0]
+    years = sorted(data.keys(Year))
+    fig = px.bar(
+        materials,
+        x=materials,
+        y=materials.index,
+        color=materials.index,
+        labels={"value": "Kg"},  # TODO: units!!!
+    )
+    fig.update_layout(
+        title=f"Materials production ({years[0]}-{years[-1]})",
+        title_font_size=24,
+        updatemenus=[x_log_switch()],
+        yaxis={"categoryorder": "total ascending"},
+    )
     return fig
