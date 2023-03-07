@@ -276,7 +276,7 @@ def combined_to_processable_input(
     indicators_resources = indicators.droplevel(0).index.to_list()
     assert set(target_techs) <= set(
         intensities_techs
-    ), "Target's technologies are not a subset of intensities' techs!"
+    ), f"Target's technologies are not a subset of intensities' techs! ({target_techs})"
 
     # Swap Year(0) with the first year from targets
     first_year = sdf.Year(target_years[0])

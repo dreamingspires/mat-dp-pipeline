@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -16,8 +17,8 @@ def x_log_switch():
     return dict(
         type="buttons",
         direction="right",
-        x=0.7,
-        y=1.1,
+        x=0.8,
+        y=1.2,
         buttons=[
             dict(
                 args=[{"xaxis.type": "linear"}],
@@ -34,10 +35,10 @@ def x_log_switch():
 
 
 def indicator_by_resource_over_years(
-    data: PipelineOutput, country: str, indicator: str
+    data: PipelineOutput, path: Path, indicator: str
 ) -> go.Figure:
     emissions = (
-        data.emissions(country, indicator)
+        data.emissions(path, indicator)
         .groupby("Year")
         .sum()
         .rename_axis("Resource", axis=1)
@@ -61,9 +62,9 @@ def indicator_by_resource_over_years(
 
 
 def indicator_by_tech_agg(
-    data: PipelineOutput, country: str, indicator: str
+    data: PipelineOutput, path: Path, indicator: str
 ) -> go.Figure:
-    emissions = data.emissions(country, indicator).dropna(how="all").reset_index()
+    emissions = data.emissions(path, indicator).dropna(how="all").reset_index()
     emissions["Tech"] = emissions["Category"] + "/" + emissions["Specific"]
     # Emissions will be a data frame with index of Techs and columns Resources
     # The values are individual emissions per given tech/resource
@@ -91,10 +92,10 @@ def indicator_by_tech_agg(
 
 
 def indicator_by_resource_agg(
-    data: PipelineOutput, country: str, indicator: str
+    data: PipelineOutput, path: Path, indicator: str
 ) -> go.Figure:
     emissions = (
-        data.emissions(country, indicator)
+        data.emissions(path, indicator)
         .reset_index(drop=True)
         .sum()
         .replace(0, np.nan)
@@ -120,9 +121,9 @@ def indicator_by_resource_agg(
     return fig
 
 
-def required_resources_over_years(data: PipelineOutput, country: str) -> go.Figure:
+def required_resources_over_years(data: PipelineOutput, path: Path) -> go.Figure:
     materials = (
-        data.resources(country).groupby("Year").sum().reset_index().set_index("Year")
+        data.resources(path).groupby("Year").sum().reset_index().set_index("Year")
     )
     materials = materials.loc[:, (materials != 0).any(axis=0)]
     fig = px.area(materials, labels={"value": "Kg"})  # TODO: !!!! UNITS!!!
@@ -131,8 +132,8 @@ def required_resources_over_years(data: PipelineOutput, country: str) -> go.Figu
     return fig
 
 
-def required_resources_by_tech_agg(data: PipelineOutput, country: str) -> go.Figure:
-    materials = data.resources(country).reset_index()
+def required_resources_by_tech_agg(data: PipelineOutput, path: Path) -> go.Figure:
+    materials = data.resources(path).reset_index()
     materials["Tech"] = materials["Category"] + "/" + materials["Specific"]
     materials = materials.drop(columns=["Category", "Specific"])
     materials = materials.set_index("Year").groupby("Tech").sum()
@@ -156,8 +157,8 @@ def required_resources_by_tech_agg(data: PipelineOutput, country: str) -> go.Fig
     return fig
 
 
-def required_resources_agg(data: PipelineOutput, country: str):
-    materials = data.resources(country).sum()
+def required_resources_agg(data: PipelineOutput, path: Path):
+    materials = data.resources(path).sum()
     materials = materials[materials > 0]
     years = sorted(data.keys(Year))
     fig = px.bar(
