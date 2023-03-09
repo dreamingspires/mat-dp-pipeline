@@ -22,6 +22,9 @@ class LabelledOutput(ProcessedOutput):
 
 
 class PipelineOutput:
+    """
+    The processed data from the pipeline in an easily accessible form.
+    """
     _by_year: dict[sdf.Year, dict[Path, LabelledOutput]]
     _by_path: dict[Path, dict[sdf.Year, LabelledOutput]]
     _length: int
@@ -133,6 +136,10 @@ class PipelineOutput:
 
 
 class DataSource(ABC):
+    """
+    A custom data source format, that has the property sdf. This property must
+    return the data source in the standard data format.
+    """
     @abstractmethod
     def __call__(self, output_dir: Path) -> None:
         """Prepare a Standard Data Format data and save it in the `output_dir`
@@ -157,6 +164,18 @@ def pipeline(
     source: Path | DataSource | None = None,
     output_path: Path | None = None,
 ) -> PipelineOutput:
+    """
+    Converts the input data to the PipelineOutput format.
+
+    Args:
+        input_data (DataSource | Path): Receives either a custom data source or a
+            path to a fully described standard data format
+        output_sdf_dir (Optional[Path], optional): If provided, outputs the standard
+            data format version of the input_data to this directory. Defaults to None.
+
+    Returns:
+        PipelineOutput: The fully converted output of the pipeline
+    """
     if isinstance(source, DataSource):
         if output_path:
             source(output_path)
