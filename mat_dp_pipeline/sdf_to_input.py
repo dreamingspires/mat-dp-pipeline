@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
+import numpy as np
 import pandas as pd
 
 import mat_dp_pipeline.standard_data_format as sdf
 
 
-@dataclass
+@dataclass(eq=False, order=False)
 class CombinedInput:
     """Input combined from hierachical structure. This is *not* year-level input.
 
@@ -21,34 +22,34 @@ class CombinedInput:
             intensities' keys
         indicators (DataFrame): (Year, Resource) x (Indicator1, Indicator2, ..., IndicatorM)
             There should be exactly N resources, matching columns in intensities frame
+        tech_meta (DataFrame): Technologies metadata
     """
 
     intensities: pd.DataFrame
     targets: pd.DataFrame
     indicators: pd.DataFrame
+    tech_meta: pd.DataFrame
 
     def copy(self) -> "CombinedInput":
         return CombinedInput(
             intensities=self.intensities.copy(),
             targets=self.targets.copy(),
             indicators=self.indicators.copy(),
+            tech_meta=self.tech_meta.copy(),
         )
 
-    def validate(self) -> bool:
+    def validate(self) -> None:
         """Validates whether an object represents a valid instance of
         CombinedInput.
-
-        Returns:
-            bool: True if valid, False otherwise
 
         Raises:
             ValueError: when validation fails
         """
-        # TODO:
-        return True
+        sdf.validate_tech_units(self.tech_meta)
+        # TODO: more validation
 
 
-@dataclass
+@dataclass(eq=False, order=False)
 class ProcessableInput:
     """Single processable input. The frames in processable input do not contain year
     dimension. This is the lowest level structure, ready for processing.
@@ -138,6 +139,14 @@ def sdf_to_combined_input(
         overlayed.indicators = overlay_in_order(
             overlayed.indicators, root.indicators, root.indicators_yearly
         )
+        if overlayed.tech_meta.empty:
+            overlayed.tech_meta = root.tech_meta
+        else:
+            overlayed.tech_meta = (
+                pd.concat([overlayed.tech_meta, root.tech_meta])
+                .groupby(level=(0, 1))
+                .last()
+            )
 
         # Go down in the hierarchy
         for name, directory in root.children.items():
@@ -147,15 +156,102 @@ def sdf_to_combined_input(
         if not root.children:
             assert root.targets is not None
             overlayed.targets = root.targets
-            assert overlayed.validate()
+            # Trim tech_meta to the techs specified in targets
+            # TODO: problem here
+            overlayed.tech_meta = overlayed.tech_meta.reindex(overlayed.targets.index)
+            overlayed.validate()
             yield label, overlayed
 
     initial = CombinedInput(
         intensities=pd.DataFrame(),
         targets=pd.DataFrame(),
         indicators=pd.DataFrame(),
+        tech_meta=pd.DataFrame(),
     )
     yield from dfs(root_sdf, initial, Path(root_sdf.name))
+
+
+def _interpolate_intensities(
+    df: pd.DataFrame, years: list[sdf.Year], techs: list[tuple[str, str]]
+) -> pd.DataFrame:
+    df_index_names = df.index.names  # to restore later
+
+    idx = pd.MultiIndex.from_tuples(
+        ((year, *tech) for year, tech in itertools.product(years, techs))
+    ).sort_values()
+
+    df = df.sort_index(axis=0).sort_index(axis=1).reindex(idx)
+    interpolated_array = df.unstack((1, 2)).interpolate(method="index").values.flatten()
+
+    def get_permutation():
+        """Creates a permutation of indexes for conversion of `interpolated_array` to
+        the flatten format of the initial `df` array. It's a bit complicated, so... you'll
+        just have to trust me on this.
+        """
+        n_techs = len(techs)
+        n_resources = len(df.columns)
+        n_years = len(years)
+
+        x, y = np.divmod(np.arange(n_techs * n_years), n_techs)
+        n = (
+            np.remainder(np.arange(n_techs * n_resources * n_years), n_resources)
+            * n_techs
+        )
+        r = np.repeat(n_techs * n_resources * x + y, n_resources)
+        final = n + r
+        return final.astype(int)
+
+    ordering = get_permutation()
+    df = pd.DataFrame(
+        interpolated_array[ordering].reshape(-1, len(df.columns)),
+        index=df.index,
+        columns=df.columns,
+    )
+
+    # index names were lost, restoring it
+    df.index.names = df_index_names
+    return df
+
+
+def _interpolate_indicators(
+    df: pd.DataFrame, years: list[sdf.Year], resources: list[str]
+) -> pd.DataFrame:
+    df_index_names = df.index.names  # to restore later
+
+    idx = pd.MultiIndex.from_product([years, resources]).sort_values()
+
+    df = df.sort_index(axis=0).sort_index(axis=1).reindex(idx)
+    interpolated_array = df.unstack().interpolate(method="index").values.flatten()
+
+    def get_permutation():
+        """Creates a permutation of indexes for conversion of `interpolated_array` to
+        the flatten format of the initial `df` array. It's a bit complicated, so... you'll
+        just have to trust me on this.
+        """
+
+        n_resources = len(resources)
+        n_indicators = len(df.columns)
+        n_years = len(years)
+
+        x, y = np.divmod(np.arange(n_resources * n_years), n_resources)
+        n = (
+            np.remainder(np.arange(n_resources * n_indicators * n_years), n_indicators)
+            * n_resources
+        )
+        r = np.repeat(n_resources * n_indicators * x + y, n_indicators)
+        final = n + r
+        return final.astype(int)
+
+    ordering = get_permutation()
+    df = pd.DataFrame(
+        interpolated_array[ordering].reshape(-1, len(df.columns)),
+        index=df.index,
+        columns=df.columns,
+    )
+
+    # index names were lost, restoring it
+    df.index.names = df_index_names
+    return df
 
 
 def combined_to_processable_input(
@@ -180,32 +276,15 @@ def combined_to_processable_input(
     indicators_resources = indicators.droplevel(0).index.to_list()
     assert set(target_techs) <= set(
         intensities_techs
-    ), "Target's technologies are not a subset of intensities' techs!"
+    ), f"Target's technologies are not a subset of intensities' techs! ({target_techs})"
 
     # Swap Year(0) with the first year from targets
     first_year = sdf.Year(target_years[0])
     intensities = intensities.rename({sdf.Year(0): first_year})
     indicators = indicators.rename({sdf.Year(0): first_year})
 
-    tech_year_idx = pd.MultiIndex.from_tuples(
-        ((year, *tech) for year, tech in itertools.product(target_years, target_techs))
-    )
-    resource_year_idx = pd.MultiIndex.from_product([target_years, indicators_resources])
-
-    intensities: pd.DataFrame = (
-        intensities.reindex(tech_year_idx)
-        .unstack()
-        .unstack()  # Leave only year in the index
-        .interpolate(method="index")
-        .stack()  # type: ignore
-        .stack()
-    )
-    indicators: pd.DataFrame = (
-        indicators.reindex(resource_year_idx)
-        .unstack()  # Leave only year in the index
-        .interpolate(method="index")
-        .stack()  # type: ignore
-    )
+    intensities = _interpolate_intensities(intensities, target_years, target_techs)
+    indicators = _interpolate_indicators(indicators, target_years, indicators_resources)
 
     # ProcessableInput is for a given year, so we have to proces year by year in a loop
     # We only consider target years, starting from the second one.
@@ -213,9 +292,9 @@ def combined_to_processable_input(
     assert isinstance(indicators, pd.DataFrame)
     for year in target_years:
         inpt = ProcessableInput(
-            intensities=intensities.loc[year, :].sort_index(),
-            targets=targets.loc[:, str(year)].sort_index(),
-            indicators=indicators.loc[year, :].sort_index(),
+            intensities=intensities.loc[year, :],  # .sort_index(),
+            targets=targets.loc[:, str(year)],  # .sort_index(),
+            indicators=indicators.loc[year, :],  # .sort_index(),
         )
         yield path, year, inpt
 

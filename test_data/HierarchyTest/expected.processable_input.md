@@ -3,18 +3,20 @@
 ## HierarchyTest/Europe/UK -- 2010
 ### Intensities
 ```
-         Steel
-Tech L0    0.0
-     L1    1.0
-     L2    2.0
+                   Steel
+Category Specific       
+Tech     L0          0.0
+         L1          1.0
+         L2          2.0
 ```
 
 ### Indicators
 ```
-        CO2
-Cement  2.0
-Coal    1.0
-Steel   3.0
+          CO2
+Resource     
+Cement    2.0
+Coal      1.0
+Steel     3.0
 ```
 
 ### Targets
@@ -28,18 +30,20 @@ Tech      L0          2010.1
 ## HierarchyTest/Europe/UK -- 2020
 ### Intensities
 ```
-         Steel
-Tech L0    0.0
-     L1    1.0
-     L2    2.0
+                   Steel
+Category Specific       
+Tech     L0          0.0
+         L1          1.0
+         L2          2.0
 ```
 
 ### Indicators
 ```
-        CO2
-Cement  2.0
-Coal    1.0
-Steel   3.0
+          CO2
+Resource     
+Cement    2.0
+Coal      1.0
+Steel     3.0
 ```
 
 ### Targets

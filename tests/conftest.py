@@ -21,7 +21,7 @@ def calculation_test_input(data_path) -> ProcessableInput:
     root = data_path("CalculationTest")
 
     intensities = pd.read_csv(root / "techs.csv").set_index(["Category", "Specific"])
-    indicators = pd.read_csv(root / "indicators.csv").set_index("Material")
+    indicators = pd.read_csv(root / "indicators.csv").set_index("Resource")
     targets = (
         pd.read_csv(root / "targets.csv").set_index(["Category", "Specific"]).iloc[:, 0]
     )

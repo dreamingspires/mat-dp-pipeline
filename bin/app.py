@@ -1,151 +1,32 @@
+import argparse
 from pathlib import Path
 
-import dash_bootstrap_components as dbc
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from dash import Dash, dcc, html
-from dash.dependencies import Input, Output
-from dash.exceptions import PreventUpdate
-
-from mat_dp_pipeline import pipeline
-from mat_dp_pipeline.pipeline import LabelledOutput, PipelineOutput
-from mat_dp_pipeline.standard_data_format import Year
+from mat_dp_pipeline import App, pipeline
+from mat_dp_pipeline.data_sources.mat_dp_db import MatDpDB
 
 
-def required_resources_fig(data: LabelledOutput) -> go.Figure:
-    resources = data.required_resources.reset_index()
-    resources["Tech"] = resources["Category"] + "/" + resources["Specific"]
-    resources = resources.drop(columns=["Category", "Specific"])
-    resources.set_index("Tech", inplace=True)
-    return px.bar(
-        resources, x=resources.columns, y=resources.index, labels={"value": "Quantity"}
-    )
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sdf-output-dir", type=Path)
+    parser.add_argument("--materials", type=Path)
+    parser.add_argument("--targets", type=Path)
 
+    args = parser.parse_args()
 
-def emissions_by_tech_fig(data: LabelledOutput) -> go.Figure:
-    # TODO:
-    return required_resources_fig(data)
+    # path = Path(__file__).parent.parent / "test_data/World"
+    # output = pipeline(path)
 
+    # MATERIALS_EXCEL = "scratch/Material_intensities_database.xlsx"
+    # TARGETS_CSV = "scratch/results_1.5deg.csv"
+    TARGETS_PARAMETERS = [
+        "Power Generation (Aggregate)",
+        "Power Generation Capacity (Aggregate)",
+    ]
 
-def emissions_by_material_fig(data: LabelledOutput) -> go.Figure:
-    emissions = data.emissions.dropna().reset_index()
-    emissions["CO3"] = emissions["CO2"] * 2
-    print(emissions)
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            emissions,
-            x=["CO2", "CO3"],
-            y="Resource",
-        )
-    )
-    fig.update_layout(scattermode="group")
-    fig.update_xaxes(type="category")
-    fig.update_yaxes(type="category")
-    return fig
-
-
-class App:
-    dash_app: Dash
-    outputs: PipelineOutput
-    selected_output: LabelledOutput | None
-
-    def __init__(self, outputs: PipelineOutput):
-        self.dash_app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
-        self.register_callback(
-            self.render_graph_tab,
-            Output("tab", "children"),
-            Input("tabs", "active_tab"),
-            Input("country", "value"),
-            Input("year", "value"),
-        )
-
-        self.outputs = outputs
-        assert len(self.outputs) == len(outputs), "Duplicated keys found!"
-        self.selected_output = None
-
-    def controls(self):
-        countries = sorted(set(self.outputs.keys(Path)))
-        body = dbc.CardBody(
-            [
-                html.Div(
-                    [
-                        html.Label("Country"),
-                        dcc.Dropdown(countries, id="country"),
-                    ]
-                )
-            ]
-        )
-
-        return dbc.Card([dbc.CardHeader("Data selection"), body], body=True)
-
-    def plots(self):
-        return [
-            dbc.Tabs(
-                [
-                    dbc.Tab(
-                        label="Emissions by material",
-                        tab_id="emissions_by_material",
-                    ),
-                    dbc.Tab(
-                        label="Emissions by tech",
-                        tab_id="emissions_by_tech",
-                    ),
-                    dbc.Tab(
-                        label="Required resources",
-                        tab_id="required_resources",
-                    ),
-                ],
-                id="tabs",
-                active_tab="emissions_by_material",
-            ),
-            html.Div(id="tab"),
-        ]
-
-    def layout(self):
-        return dbc.Container(
-            [
-                html.H1("Mat DP"),
-                html.Hr(),
-                dbc.Row(
-                    [
-                        dbc.Col(self.controls(), md=4, align="start"),
-                        dbc.Col(self.plots(), md=8),
-                    ],
-                    align="center",
-                ),
-            ],
-            fluid=True,
-        )
-
-    def tab_layout(self, title: str, fig: go.Figure):
-        return [html.H2(title), dcc.Graph(figure=fig)]
-
-    def render_graph_tab(self, tab, country, year):
-        self.selected_output = self.outputs[country, year]
-        if not self.selected_output:
-            raise PreventUpdate
-
-        if tab == "emissions_by_material":
-            fig = emissions_by_material_fig(self.selected_output)
-            return self.tab_layout("Emissions from material production", fig)
-        elif tab == "emissions_by_tech":
-            fig = emissions_by_tech_fig(self.selected_output)
-            return self.tab_layout("Emissions by technolgy", fig)
-        elif tab == "required_resources":
-            fig = required_resources_fig(self.selected_output)
-            return self.tab_layout("Required resources", fig)
-
-    def register_callback(self, fn, *spec):
-        self.dash_app.callback(*spec)(fn)
-
-    def serve(self):
-        self.dash_app.layout = self.layout()
-        self.dash_app.run_server(debug=True)
+    ds = MatDpDB(args.materials, args.targets, TARGETS_PARAMETERS)
+    output = pipeline(ds, output_path=args.sdf_output_dir)
+    App(output, ["Parameter"]).serve()
 
 
 if __name__ == "__main__":
-    path = Path(__file__).parent.parent / "test_data/World"
-    output = pipeline(path)
-    App(output).serve()
+    main()
