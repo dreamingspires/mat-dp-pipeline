@@ -1,13 +1,9 @@
-import itertools
 from pathlib import Path
 
 import pandas as pd
 
-from mat_dp_pipeline.data_sources.generic import IndicatorsSource, IntensitiesSource
-from mat_dp_pipeline.data_sources.utils import (
-    default_location_mapping,
-    location_to_path,
-)
+from mat_dp_pipeline.data_sources.definitions import IndicatorsSource, IntensitiesSource
+from mat_dp_pipeline.data_sources.utils import location_to_path
 
 
 class MatDPDBIntensitiesSource(IntensitiesSource):

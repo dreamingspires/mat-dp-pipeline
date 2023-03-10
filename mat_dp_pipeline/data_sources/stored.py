@@ -1,31 +1,13 @@
 import re
 import shutil
-from abc import ABC, abstractmethod
 from pathlib import Path
 
 import mat_dp_pipeline.standard_data_format as sdf
-
-
-class BaseSource(ABC):
-    @abstractmethod
-    def __call__(self, output_dir: Path) -> None:
-        """Prepare a Standard Data Format data and save it in the `output_dir`
-        Args:
-            output_dir (Path): Output SDF root directory
-        """
-        ...
-
-
-class IntensitiesSource(BaseSource):
-    pass
-
-
-class TargetsSource(BaseSource):
-    pass
-
-
-class IndicatorsSource(BaseSource):
-    pass
+from mat_dp_pipeline.data_sources.definitions import (
+    IndicatorsSource,
+    IntensitiesSource,
+    TargetsSource,
+)
 
 
 def copy_files(src: Path, dst: Path, file_pattern: re.Pattern) -> None:
