@@ -8,17 +8,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from mat_dp_pipeline.common import FileOrPath
+from mat_dp_pipeline.common import FileOrPath, validate
 
 Year = int
 
 
-def validate(condition: bool, error_message: str | None = None):
-    if not condition:
-        raise ValueError(error_message)
-
-
-def validate_tech_units(tech_meta: pd.DataFrame):
+def validate_tech_units(tech_meta):
     if tech_meta.empty:
         return
     validate(
@@ -120,18 +115,30 @@ class StandardDataFormat:
         def has(item) -> bool:
             return item is not None
 
+        def validate_yearly_keys(base: pd.DataFrame, yearly: dict[Year, pd.DataFrame]):
+            base_keys = set(base.index.unique())
+
+            for year, df in yearly.items():
+                validate(
+                    set(df.index.unique()) <= base_keys,
+                    f"{self.name}: Yearly file ({year}) introduces new items!",
+                )
+
         validate(
             has(self.targets) != (len(self.children) > 0),
-            "SDF must either have children in the hierarchy or defined targets (leaf level)",
+            f"{self.name}: SDF must either have children in the hierarchy or defined targets (leaf level)",
         )
         validate(
             has(self.intensities) or not has(self.intensities_yearly),
-            "No base intensities, while yearly files provided!",
+            f"{self.name}: No base intensities, while yearly files provided!",
         )
         validate(
             has(self.indicators) or not has(self.indicators_yearly),
-            "No base indicators, while yearly files provided!",
+            f"{self.name}: No base indicators, while yearly files provided!",
         )
+        validate_yearly_keys(self.intensities, self.intensities_yearly)
+        validate_yearly_keys(self.indicators, self.indicators_yearly)
+
         try:
             validate_tech_units(self.tech_meta)
         except ValueError as e:
@@ -140,26 +147,46 @@ class StandardDataFormat:
             # us then. Just warn for now. We'll validate again for the calculation.
             logging.warning(e)
 
-    def save(self, output_dir: Path) -> None:
-        assert output_dir.is_dir()
-        output_dir = output_dir / self.name
+    def _prepare_output_dir(self, root_dir: Path) -> Path:
+        output_dir = root_dir / self.name
         output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
+
+    def save_intensities(self, root_dir: Path) -> None:
+        output_dir = self._prepare_output_dir(root_dir)
 
         if not self.intensities.empty:
             self.intensities.to_csv(output_dir / "intensities.csv")
         for year, intensities in self.intensities_yearly.items():
             intensities.to_csv(output_dir / f"intensities_{year}.csv")
 
+        for sdf in self.children.values():
+            sdf.save_intensities(output_dir)
+
+    def save_indicators(self, root_dir: Path) -> None:
+        output_dir = self._prepare_output_dir(root_dir)
+
         if not self.indicators.empty:
             self.indicators.to_csv(output_dir / "indicators.csv")
         for year, indicators in self.indicators_yearly.items():
             indicators.to_csv(output_dir / f"indicators_{year}.csv")
 
+        for sdf in self.children.values():
+            sdf.save_indicators(output_dir)
+
+    def save_targets(self, root_dir: Path) -> None:
+        output_dir = self._prepare_output_dir(root_dir)
+
         if self.targets is not None:
             self.targets.to_csv(output_dir / "targets.csv")
         else:
-            for name, sdf in self.children.items():
-                sdf.save(output_dir / name)
+            for sdf in self.children.values():
+                sdf.save_targets(output_dir)
+
+    def save(self, root_dir: Path) -> None:
+        self.save_intensities(root_dir)
+        self.save_indicators(root_dir)
+        self.save_targets(root_dir)
 
 
 def load(input_dir: Path) -> StandardDataFormat:

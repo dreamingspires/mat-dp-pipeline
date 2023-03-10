@@ -1,8 +1,8 @@
 __all__ = [
     "LabelledOutput",
-    "pipeline",
-    "DataSource",
     "PipelineOutput",
+    "pipeline",
+    "create_sdf",
     "StandardDataFormat",
     "Year",
     "App",
@@ -10,9 +10,9 @@ __all__ = [
 
 from mat_dp_pipeline.application import App
 from mat_dp_pipeline.pipeline import (
-    DataSource,
     LabelledOutput,
     PipelineOutput,
+    create_sdf,
     pipeline,
 )
 from mat_dp_pipeline.standard_data_format import StandardDataFormat, Year

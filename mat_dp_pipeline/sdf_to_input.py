@@ -1,4 +1,5 @@
 import itertools
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
@@ -7,11 +8,15 @@ import numpy as np
 import pandas as pd
 
 import mat_dp_pipeline.standard_data_format as sdf
+from mat_dp_pipeline.common import validate
 
 
 @dataclass(eq=False, order=False)
-class CombinedInput:
-    """Input combined from hierachical structure. This is *not* year-level input.
+class SparseYearsInput:
+    """Data amalgamated from hierachical structure, with poterntial gaps between the years.
+
+    The gaps between years are later filled with values (interpolated), but this isn't in scope
+    of this class.
 
     Year is another dimension here -- level 0 index in intensities & indicators,
     year columns in targets.
@@ -30,8 +35,8 @@ class CombinedInput:
     indicators: pd.DataFrame
     tech_meta: pd.DataFrame
 
-    def copy(self) -> "CombinedInput":
-        return CombinedInput(
+    def copy(self) -> "SparseYearsInput":
+        return SparseYearsInput(
             intensities=self.intensities.copy(),
             targets=self.targets.copy(),
             indicators=self.indicators.copy(),
@@ -46,7 +51,22 @@ class CombinedInput:
             ValueError: when validation fails
         """
         sdf.validate_tech_units(self.tech_meta)
-        # TODO: more validation
+        intensities_resources = set(self.intensities.columns)
+        indicators_resources = set(self.indicators.index.get_level_values("Resource"))
+        common_resources = intensities_resources & indicators_resources
+        diff = intensities_resources.symmetric_difference(indicators_resources)
+        if diff:
+            sorted_resources = sorted(common_resources)
+            self.intensities = self.intensities.reindex(columns=sorted_resources)
+            self.indicators = self.indicators.reindex(
+                sorted_resources, level="Resource"
+            )
+
+        # TODO: this is weird, throwing after reindex? Maybe ok? Discussion needed ;)
+        validate(
+            not diff,
+            f"Intensities' and indicators' resources aren't matched on keys: {diff}",
+        )
 
 
 @dataclass(eq=False, order=False)
@@ -104,16 +124,12 @@ def overlay_in_order(
 ) -> pd.DataFrame:
     overlayed = df
 
-    base_keys = set(base_overlay.index.to_list())
     # Overlays sorted by year, first one being base_overlay (year 0)
     sorted_overlays = sorted(({sdf.Year(0): base_overlay} | yearly_overlays).items())
 
     for year, overlay in sorted_overlays:
         if overlay.empty:
             continue
-        assert (
-            set(overlay.index.to_list()) <= base_keys
-        ), "Yearly file cannot introduce new items!"
 
         # Add "Year" level to the index. Concat is idiomatic way of doing it
         update_df = pd.concat({year: overlay}, names=["Year"])
@@ -126,12 +142,19 @@ def overlay_in_order(
     return overlayed
 
 
-def sdf_to_combined_input(
+def flatten_hierarchy(
     root_sdf: sdf.StandardDataFormat,
-) -> Iterator[tuple[Path, CombinedInput]]:
+) -> Iterator[tuple[Path, SparseYearsInput]]:
     def dfs(
-        root: sdf.StandardDataFormat, inpt: CombinedInput, label: Path
-    ) -> Iterator[tuple[Path, CombinedInput]]:
+        root: sdf.StandardDataFormat, inpt: SparseYearsInput, label: Path
+    ) -> Iterator[tuple[Path, SparseYearsInput]]:
+        validate(
+            root.indicators.empty
+            or inpt.indicators.empty
+            or list(inpt.indicators.columns) == list(root.indicators.columns),
+            f"{label}: Indicators' names on each level have to be the same!",
+        )
+
         overlayed = inpt.copy()
         overlayed.intensities = overlay_in_order(
             overlayed.intensities, root.intensities, root.intensities_yearly
@@ -157,12 +180,19 @@ def sdf_to_combined_input(
             assert root.targets is not None
             overlayed.targets = root.targets
             # Trim tech_meta to the techs specified in targets
-            # TODO: problem here
             overlayed.tech_meta = overlayed.tech_meta.reindex(overlayed.targets.index)
-            overlayed.validate()
+
+            # TODO: add a parameter controlling whether validation yields a warning or exception or is ignored
+            # Maybe group the errors and show at the end, otherwise there's a LOT of errors
+            try:
+                overlayed.validate()
+            except ValueError as e:
+                logging.error(f"Validation failed for {label}")
+                logging.error(e)
+                # raise e
             yield label, overlayed
 
-    initial = CombinedInput(
+    initial = SparseYearsInput(
         intensities=pd.DataFrame(),
         targets=pd.DataFrame(),
         indicators=pd.DataFrame(),
@@ -254,12 +284,12 @@ def _interpolate_indicators(
     return df
 
 
-def combined_to_processable_input(
-    path: Path, combined: CombinedInput
+def to_processable_input(
+    path: Path, sparse_years_input: SparseYearsInput
 ) -> Iterator[tuple[Path, sdf.Year, ProcessableInput]]:
-    intensities = combined.intensities
-    targets = combined.targets
-    indicators = combined.indicators
+    intensities = sparse_years_input.intensities
+    targets = sparse_years_input.targets
+    indicators = sparse_years_input.indicators
 
     intensities_years = list(intensities.index.get_level_values(0).unique())
     indicator_years = list(indicators.index.get_level_values(0).unique())
@@ -292,9 +322,9 @@ def combined_to_processable_input(
     assert isinstance(indicators, pd.DataFrame)
     for year in target_years:
         inpt = ProcessableInput(
-            intensities=intensities.loc[year, :],  # .sort_index(),
-            targets=targets.loc[:, str(year)],  # .sort_index(),
-            indicators=indicators.loc[year, :],  # .sort_index(),
+            intensities=intensities.loc[year, :],
+            targets=targets.loc[:, str(year)],
+            indicators=indicators.loc[year, :],
         )
         yield path, year, inpt
 
@@ -302,5 +332,5 @@ def combined_to_processable_input(
 def sdf_to_processable_input(
     root: sdf.StandardDataFormat,
 ) -> Iterator[tuple[Path, sdf.Year, ProcessableInput]]:
-    for path, combined in sdf_to_combined_input(root):
-        yield from combined_to_processable_input(path, combined)
+    for path, sparse_years_input in flatten_hierarchy(root):
+        yield from to_processable_input(path, sparse_years_input)

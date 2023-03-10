@@ -1,5 +1,4 @@
 import tempfile
-from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,26 +6,24 @@ from typing import Iterator, overload
 
 import pandas as pd
 
-import mat_dp_pipeline.standard_data_format as sdf
+import mat_dp_pipeline.data_sources as ds
 from mat_dp_pipeline.calculation import ProcessedOutput, calculate
-from mat_dp_pipeline.sdf_to_input import (
-    combined_to_processable_input,
-    sdf_to_combined_input,
-)
+from mat_dp_pipeline.sdf_to_input import flatten_hierarchy, to_processable_input
+from mat_dp_pipeline.standard_data_format import StandardDataFormat, Year
+from mat_dp_pipeline.standard_data_format import load as load_sdf
 
 
 @dataclass(frozen=True)
 class LabelledOutput(ProcessedOutput):
-    year: sdf.Year
+    year: Year
     path: Path
 
 
 class PipelineOutput:
-    """
-    The processed data from the pipeline in an easily accessible form.
-    """
-    _by_year: dict[sdf.Year, dict[Path, LabelledOutput]]
-    _by_path: dict[Path, dict[sdf.Year, LabelledOutput]]
+    """The processed data from the pipeline in an easily accessible form."""
+
+    _by_year: dict[Year, dict[Path, LabelledOutput]]
+    _by_path: dict[Path, dict[Year, LabelledOutput]]
     _length: int
     _indicators: set[str]
     _tech_meta: pd.DataFrame
@@ -39,6 +36,7 @@ class PipelineOutput:
         if data:
             # We know from the computation that each LabelledOutput has the same
             # set of indicators, so we'll just take the first one
+            # TODO: we must assert somewhere (not here?) that all the outputs have the same indicators
             self._indicators = data[0].indicators
         else:
             self._indicators = set()
@@ -69,16 +67,16 @@ class PipelineOutput:
         )
 
     @property
-    def by_year(self) -> dict[sdf.Year, dict[Path, LabelledOutput]]:
+    def by_year(self) -> dict[Year, dict[Path, LabelledOutput]]:
         return self._by_year
 
     @property
-    def by_path(self) -> dict[Path, dict[sdf.Year, LabelledOutput]]:
+    def by_path(self) -> dict[Path, dict[Year, LabelledOutput]]:
         return self._by_path
 
     def keys(self, axis: type):
-        assert axis in (sdf.Year, Path)
-        if axis == sdf.Year:
+        assert axis in (Year, Path)
+        if axis == Year:
             return self.by_year.keys()
         else:
             return self.by_path.keys()
@@ -92,30 +90,26 @@ class PipelineOutput:
         return self._tech_meta
 
     @overload
-    def __getitem__(self, key: sdf.Year) -> dict[Path, LabelledOutput]:
+    def __getitem__(self, key: Year) -> dict[Path, LabelledOutput]:
         ...
 
     @overload
-    def __getitem__(self, key: Path | str) -> dict[sdf.Year, LabelledOutput]:
+    def __getitem__(self, key: Path | str) -> dict[Year, LabelledOutput]:
         ...
 
     @overload
-    def __getitem__(self, key: tuple[sdf.Year, Path | str]) -> LabelledOutput:
+    def __getitem__(self, key: tuple[Year, Path | str]) -> LabelledOutput:
         ...
 
     @overload
-    def __getitem__(self, key: tuple[Path | str, sdf.Year]) -> LabelledOutput:
+    def __getitem__(self, key: tuple[Path | str, Year]) -> LabelledOutput:
         ...
 
     def __getitem__(
         self,
-        key: sdf.Year
-        | Path
-        | str
-        | tuple[sdf.Year, Path | str]
-        | tuple[Path | str, sdf.Year],
-    ) -> dict[Path, LabelledOutput] | dict[sdf.Year, LabelledOutput] | LabelledOutput:
-        if isinstance(key, sdf.Year):
+        key: Year | Path | str | tuple[Year, Path | str] | tuple[Path | str, Year],
+    ) -> dict[Path, LabelledOutput] | dict[Year, LabelledOutput] | LabelledOutput:
+        if isinstance(key, Year):
             return self.by_year[key]
         elif isinstance(key, (Path, str)):
             return self.by_path[Path(key)]
@@ -124,7 +118,7 @@ class PipelineOutput:
             year, path = key
             if isinstance(year, (Path, str)):
                 path, year = year, path
-            assert isinstance(year, sdf.Year) and isinstance(path, (Path, str))
+            assert isinstance(year, Year) and isinstance(path, (Path, str))
             return self.by_year[year][Path(path)]
 
     def __iter__(self) -> Iterator[LabelledOutput]:
@@ -135,66 +129,57 @@ class PipelineOutput:
         return self._length
 
 
-class DataSource(ABC):
-    """
-    A custom data source format, that has the property sdf. This property must
-    return the data source in the standard data format.
-    """
-    @abstractmethod
-    def __call__(self, output_dir: Path) -> None:
-        """Prepare a Standard Data Format data and save it in the `output_dir`
-
-        Args:
-            output_dir (Path): Output SDF root directory
-        """
-        ...
-
-
 @overload
-def pipeline(source: Path) -> PipelineOutput:
+def create_sdf(
+    *,
+    intensities: ds.IntensitiesSource,
+    indicators: ds.IndicatorsSource,
+    targets: ds.TargetsSource | list[ds.TargetsSource],
+) -> StandardDataFormat:
     ...
 
 
 @overload
-def pipeline(source: DataSource, output_path: Path | None = None) -> PipelineOutput:
+def create_sdf(source: Path | str) -> StandardDataFormat:
     ...
 
 
-def pipeline(
-    source: Path | DataSource | None = None,
-    output_path: Path | None = None,
-) -> PipelineOutput:
-    """
-    Converts the input data to the PipelineOutput format.
+def create_sdf(
+    source: Path | str | None = None,
+    *,
+    intensities: ds.IntensitiesSource | None = None,
+    indicators: ds.IndicatorsSource | None = None,
+    targets: ds.TargetsSource | list[ds.TargetsSource] | None = None,
+) -> StandardDataFormat:
+    if source:
+        return load_sdf(Path(source))
+    else:
+        assert intensities and indicators and targets
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
 
-    Args:
-        input_data (DataSource | Path): Receives either a custom data source or a
-            path to a fully described standard data format
-        output_sdf_dir (Optional[Path], optional): If provided, outputs the standard
-            data format version of the input_data to this directory. Defaults to None.
+            targets_list = targets if isinstance(targets, list) else [targets]
+            for t in targets_list:
+                t(path)
+            intensities(path)
+            indicators(path)
+
+            return load_sdf(path)
+
+
+def pipeline(sdf: StandardDataFormat) -> PipelineOutput:
+    """Converts the input data to the PipelineOutput format.
 
     Returns:
         PipelineOutput: The fully converted output of the pipeline
     """
-    if isinstance(source, DataSource):
-        if output_path:
-            source(output_path)
-            out_sdf = sdf.load(Path(output_path))
-        else:
-            with tempfile.TemporaryDirectory() as dirpath:
-                source(Path(dirpath))
-                out_sdf = sdf.load(Path(dirpath))
-    else:
-        assert isinstance(source, Path)
-        out_sdf = sdf.load(source)
-
     processed = []
     tech_meta = pd.DataFrame()
-    for path, combined in sdf_to_combined_input(out_sdf):
+    for path, sparse_years in flatten_hierarchy(sdf):
         tech_meta = (
-            pd.concat([combined.tech_meta, tech_meta]).groupby(level=(0, 1)).last()
+            pd.concat([sparse_years.tech_meta, tech_meta]).groupby(level=(0, 1)).last()
         )
-        for path, year, inpt in combined_to_processable_input(path, combined):
+        for path, year, inpt in to_processable_input(path, sparse_years):
             result = calculate(inpt)
             processed.append(
                 LabelledOutput(
