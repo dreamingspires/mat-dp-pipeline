@@ -13,7 +13,7 @@ from mat_dp_pipeline.common import validate
 
 @dataclass(eq=False, order=False)
 class SparseYearsInput:
-    """Data amalgamated from hierachical structure, with poterntial gaps between the years.
+    """Data amalgamated from hierachical structure, with potential gaps between the years.
 
     The gaps between years are later filled with values (interpolated), but this isn't in scope
     of this class.
@@ -27,20 +27,20 @@ class SparseYearsInput:
             intensities' keys
         indicators (DataFrame): (Year, Resource) x (Indicator1, Indicator2, ..., IndicatorM)
             There should be exactly N resources, matching columns in intensities frame
-        tech_meta (DataFrame): Technologies metadata
+        tech_metadata (DataFrame): Technologies metadata
     """
 
     intensities: pd.DataFrame
     targets: pd.DataFrame
     indicators: pd.DataFrame
-    tech_meta: pd.DataFrame
+    tech_metadata: pd.DataFrame
 
     def copy(self) -> "SparseYearsInput":
         return SparseYearsInput(
             intensities=self.intensities.copy(),
             targets=self.targets.copy(),
             indicators=self.indicators.copy(),
-            tech_meta=self.tech_meta.copy(),
+            tech_metadata=self.tech_metadata.copy(),
         )
 
     def validate(self) -> None:
@@ -50,7 +50,7 @@ class SparseYearsInput:
         Raises:
             ValueError: when validation fails
         """
-        sdf.validate_tech_units(self.tech_meta)
+        sdf.validate_tech_units(self.tech_metadata)
         intensities_resources = set(self.intensities.columns)
         indicators_resources = set(self.indicators.index.get_level_values("Resource"))
         common_resources = intensities_resources & indicators_resources
@@ -162,11 +162,11 @@ def flatten_hierarchy(
         overlayed.indicators = overlay_in_order(
             overlayed.indicators, root.indicators, root.indicators_yearly
         )
-        if overlayed.tech_meta.empty:
-            overlayed.tech_meta = root.tech_meta
+        if overlayed.tech_metadata.empty:
+            overlayed.tech_metadata = root.tech_metadata
         else:
-            overlayed.tech_meta = (
-                pd.concat([overlayed.tech_meta, root.tech_meta])
+            overlayed.tech_metadata = (
+                pd.concat([overlayed.tech_metadata, root.tech_metadata])
                 .groupby(level=(0, 1))
                 .last()
             )
@@ -180,7 +180,9 @@ def flatten_hierarchy(
             assert root.targets is not None
             overlayed.targets = root.targets
             # Trim tech_meta to the techs specified in targets
-            overlayed.tech_meta = overlayed.tech_meta.reindex(overlayed.targets.index)
+            overlayed.tech_metadata = overlayed.tech_metadata.reindex(
+                overlayed.targets.index
+            )
 
             # TODO: add a parameter controlling whether validation yields a warning or exception or is ignored
             # Maybe group the errors and show at the end, otherwise there's a LOT of errors
@@ -196,7 +198,7 @@ def flatten_hierarchy(
         intensities=pd.DataFrame(),
         targets=pd.DataFrame(),
         indicators=pd.DataFrame(),
-        tech_meta=pd.DataFrame(),
+        tech_metadata=pd.DataFrame(),
     )
     yield from dfs(root_sdf, initial, Path(root_sdf.name))
 

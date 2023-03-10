@@ -13,15 +13,15 @@ from mat_dp_pipeline.common import FileOrPath, validate
 Year = int
 
 
-def validate_tech_units(tech_meta):
-    if tech_meta.empty:
+def validate_tech_units(tech_metadata: pd.DataFrame) -> None:
+    if tech_metadata.empty:
         return
     validate(
-        (tech_meta.loc[:, "Material Unit"].groupby(level=0).nunique() == 1).all(),
+        (tech_metadata.loc[:, "Material Unit"].groupby(level=0).nunique() == 1).all(),
         "There are tech categories with non-unique Material Unit!",
     )
     validate(
-        (tech_meta.loc[:, "Production Unit"].groupby(level=0).nunique() == 1).all(),
+        (tech_metadata.loc[:, "Production Unit"].groupby(level=0).nunique() == 1).all(),
         "There are tech categories with non-unique Production Unit!",
     )
 
@@ -103,7 +103,7 @@ class StandardDataFormat:
     targets: pd.DataFrame | None
     children: dict[str, "StandardDataFormat"]
 
-    tech_meta: pd.DataFrame
+    tech_metadata: pd.DataFrame
 
     def __post_init__(self):
         self.validate()
@@ -140,7 +140,7 @@ class StandardDataFormat:
         validate_yearly_keys(self.indicators, self.indicators_yearly)
 
         try:
-            validate_tech_units(self.tech_meta)
+            validate_tech_units(self.tech_metadata)
         except ValueError as e:
             # This isn't a problem just yet - it's possible that the ones with
             # more than one distinct unit won't be in the targets. It won't bother
@@ -242,19 +242,19 @@ def load(input_dir: Path) -> StandardDataFormat:
             logging.warning(f"No targets found in {root.name}. Ignoring.")
             return
         else:
-            # *Move* metadata from all intensity frames into tech_meta
-            tech_meta_cols = ["Description", "Material Unit", "Production Unit"]
+            # *Move* metadata from all intensity frames into tech_metadata
+            tech_metadata_cols = ["Description", "Material Unit", "Production Unit"]
             all_intensities = list(intensities_yearly.values()) + [intensities]
-            all_meta = [
-                i.loc[:, tech_meta_cols] for i in all_intensities if not i.empty
+            all_metadata = [
+                i.loc[:, tech_metadata_cols] for i in all_intensities if not i.empty
             ]
-            if all_meta:
-                tech_meta = pd.concat(all_meta).groupby(level=(0, 1)).last()
+            if all_metadata:
+                tech_metadata = pd.concat(all_metadata).groupby(level=(0, 1)).last()
             else:
-                tech_meta = pd.DataFrame()
+                tech_metadata = pd.DataFrame()
 
             for inten in filter(lambda df: not df.empty, all_intensities):
-                inten.drop(columns=tech_meta_cols, inplace=True)
+                inten.drop(columns=tech_metadata_cols, inplace=True)
 
             return StandardDataFormat(
                 name=root.name,
@@ -264,7 +264,7 @@ def load(input_dir: Path) -> StandardDataFormat:
                 indicators_yearly=indicators_yearly,
                 targets=targets,
                 children=children,
-                tech_meta=tech_meta,
+                tech_metadata=tech_metadata,
             )
 
     root_dfs = dfs(input_dir)

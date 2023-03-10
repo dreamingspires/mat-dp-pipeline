@@ -26,12 +26,12 @@ class PipelineOutput:
     _by_path: dict[Path, dict[Year, LabelledOutput]]
     _length: int
     _indicators: set[str]
-    _tech_meta: pd.DataFrame
+    _tech_metadata: pd.DataFrame
 
-    def __init__(self, data: list[LabelledOutput], tech_meta: pd.DataFrame):
+    def __init__(self, data: list[LabelledOutput], tech_metadata: pd.DataFrame):
         self._by_year = defaultdict(dict)
         self._by_path = defaultdict(dict)
-        self._tech_meta = tech_meta
+        self._tech_metadata = tech_metadata
 
         if data:
             # We know from the computation that each LabelledOutput has the same
@@ -86,8 +86,8 @@ class PipelineOutput:
         return self._indicators
 
     @property
-    def tech_meta(self):
-        return self._tech_meta
+    def tech_metadata(self):
+        return self._tech_metadata
 
     @overload
     def __getitem__(self, key: Year) -> dict[Path, LabelledOutput]:
@@ -174,10 +174,12 @@ def pipeline(sdf: StandardDataFormat) -> PipelineOutput:
         PipelineOutput: The fully converted output of the pipeline
     """
     processed = []
-    tech_meta = pd.DataFrame()
+    tech_metadata = pd.DataFrame()
     for path, sparse_years in flatten_hierarchy(sdf):
-        tech_meta = (
-            pd.concat([sparse_years.tech_meta, tech_meta]).groupby(level=(0, 1)).last()
+        tech_metadata = (
+            pd.concat([sparse_years.tech_metadata, tech_metadata])
+            .groupby(level=(0, 1))
+            .last()
         )
         for path, year, inpt in to_processable_input(path, sparse_years):
             result = calculate(inpt)
@@ -189,4 +191,4 @@ def pipeline(sdf: StandardDataFormat) -> PipelineOutput:
                     path=path,
                 )
             )
-    return PipelineOutput(processed, tech_meta)
+    return PipelineOutput(processed, tech_metadata)
