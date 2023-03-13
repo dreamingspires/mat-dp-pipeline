@@ -112,9 +112,6 @@ class StandardDataFormat:
         return self.targets is not None
 
     def validate(self) -> None:
-        def has(item) -> bool:
-            return item is not None
-
         def validate_yearly_keys(base: pd.DataFrame, yearly: dict[Year, pd.DataFrame]):
             base_keys = set(base.index.unique())
 
@@ -125,15 +122,15 @@ class StandardDataFormat:
                 )
 
         validate(
-            has(self.targets) != (len(self.children) > 0),
+            (self.targets is not None) != (len(self.children) > 0),
             f"{self.name}: SDF must either have children in the hierarchy or defined targets (leaf level)",
         )
         validate(
-            has(self.intensities) or not has(self.intensities_yearly),
+            (self.intensities is not None) or (self.intensities_yearly is None),
             f"{self.name}: No base intensities, while yearly files provided!",
         )
         validate(
-            has(self.indicators) or not has(self.indicators_yearly),
+            (self.indicators is not None) or (self.indicators_yearly is None),
             f"{self.name}: No base indicators, while yearly files provided!",
         )
         validate_yearly_keys(self.intensities, self.intensities_yearly)

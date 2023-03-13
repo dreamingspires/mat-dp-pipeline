@@ -1,17 +1,8 @@
 import argparse
 from pathlib import Path
 
+import mat_dp_pipeline.data_sources as ds
 from mat_dp_pipeline import App, create_sdf, pipeline
-from mat_dp_pipeline.data_sources import (
-    StoredIndicators,
-    StoredIntensities,
-    StoredTargets,
-)
-from mat_dp_pipeline.data_sources.mat_dp_db import (
-    MatDPDBIndicatorsSource,
-    MatDPDBIntensitiesSource,
-)
-from mat_dp_pipeline.data_sources.tmba import TMBATargetsSource
 
 
 def main():
@@ -33,9 +24,9 @@ def main():
         # TODO: this is just a quick hacky/demo version of course
         assert args.materials and args.targets
         sdf = create_sdf(
-            intensities=MatDPDBIntensitiesSource(args.materials),
-            indicators=MatDPDBIndicatorsSource(args.materials),
-            targets=TMBATargetsSource(args.targets, TARGETS_PARAMETERS),
+            intensities=ds.MatDPDBIntensitiesSource(args.materials),
+            indicators=ds.MatDPDBIndicatorsSource(args.materials),
+            targets=ds.TMBATargetsSource(args.targets, TARGETS_PARAMETERS),
         )
     else:
         sdf = create_sdf(args.sdf_source)
