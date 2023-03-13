@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from mat_dp_pipeline.sdf_to_input import ProcessableInput
+from mat_dp_pipeline.pipeline.sdf_to_input import ProcessableInput
 
 
 @dataclass(frozen=True, order=False, eq=False)

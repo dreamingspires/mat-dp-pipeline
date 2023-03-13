@@ -6,12 +6,12 @@ from typing import TextIO
 
 import pytest
 
-from mat_dp_pipeline import standard_data_format as sdf
-from mat_dp_pipeline.sdf_to_input import (
+from mat_dp_pipeline.pipeline.sdf_to_input import (
     ProcessableInput,
     flatten_hierarchy,
     sdf_to_processable_input,
 )
+from mat_dp_pipeline.sdf import standard_data_format as sdf
 
 
 class DiffError(Exception):

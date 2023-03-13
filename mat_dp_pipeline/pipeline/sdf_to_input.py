@@ -7,7 +7,7 @@ from typing import Iterator
 import numpy as np
 import pandas as pd
 
-import mat_dp_pipeline.standard_data_format as sdf
+import mat_dp_pipeline.sdf.standard_data_format as sdf
 from mat_dp_pipeline.common import validate
 
 

@@ -9,7 +9,7 @@ from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 
 from mat_dp_pipeline.pipeline import PipelineOutput
-from mat_dp_pipeline.plotting import (
+from mat_dp_pipeline.presentation.plotting import (
     indicator_by_resource_agg,
     indicator_by_resource_over_years,
     indicator_by_tech_agg,

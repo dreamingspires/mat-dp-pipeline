@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from mat_dp_pipeline.sdf_to_input import ProcessableInput
+from mat_dp_pipeline.pipeline.sdf_to_input import ProcessableInput
 
 
 @pytest.fixture()

@@ -2,7 +2,7 @@ import re
 import shutil
 from pathlib import Path
 
-import mat_dp_pipeline.standard_data_format as sdf
+import mat_dp_pipeline.sdf.standard_data_format as sdf
 from mat_dp_pipeline.data_sources.definitions import (
     IndicatorsSource,
     IntensitiesSource,

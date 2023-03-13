@@ -6,7 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from mat_dp_pipeline.pipeline import PipelineOutput
-from mat_dp_pipeline.standard_data_format import Year
+from mat_dp_pipeline.sdf import Year
 
 IndicatorPlotter = Callable[[PipelineOutput, str, str], go.Figure]
 RequiredResourcesPlotter = Callable[[PipelineOutput, str], go.Figure]

@@ -1,4 +1,3 @@
-import tempfile
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,11 +5,12 @@ from typing import Iterator, overload
 
 import pandas as pd
 
-import mat_dp_pipeline.data_sources as ds
-from mat_dp_pipeline.calculation import ProcessedOutput, calculate
-from mat_dp_pipeline.sdf_to_input import flatten_hierarchy, to_processable_input
-from mat_dp_pipeline.standard_data_format import StandardDataFormat, Year
-from mat_dp_pipeline.standard_data_format import load as load_sdf
+from mat_dp_pipeline.pipeline.calculation import ProcessedOutput, calculate
+from mat_dp_pipeline.pipeline.sdf_to_input import (
+    flatten_hierarchy,
+    to_processable_input,
+)
+from mat_dp_pipeline.sdf import StandardDataFormat, Year
 
 
 @dataclass(frozen=True)
@@ -127,44 +127,6 @@ class PipelineOutput:
 
     def __len__(self) -> int:
         return self._length
-
-
-@overload
-def create_sdf(
-    *,
-    intensities: ds.IntensitiesSource,
-    indicators: ds.IndicatorsSource,
-    targets: ds.TargetsSource | list[ds.TargetsSource],
-) -> StandardDataFormat:
-    ...
-
-
-@overload
-def create_sdf(source: Path | str) -> StandardDataFormat:
-    ...
-
-
-def create_sdf(
-    source: Path | str | None = None,
-    *,
-    intensities: ds.IntensitiesSource | None = None,
-    indicators: ds.IndicatorsSource | None = None,
-    targets: ds.TargetsSource | list[ds.TargetsSource] | None = None,
-) -> StandardDataFormat:
-    if source:
-        return load_sdf(Path(source))
-    else:
-        assert intensities and indicators and targets
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            path = Path(tmp_dir)
-
-            targets_list = targets if isinstance(targets, list) else [targets]
-            for t in targets_list:
-                t(path)
-            intensities(path)
-            indicators(path)
-
-            return load_sdf(path)
 
 
 def pipeline(sdf: StandardDataFormat) -> PipelineOutput:
