@@ -8,25 +8,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from mat_dp_pipeline.common import FileOrPath
+from mat_dp_pipeline.common import FileOrPath, validate
 
 Year = int
 
 
-def validate(condition: bool, error_message: str | None = None):
-    if not condition:
-        raise ValueError(error_message)
-
-
-def validate_tech_units(tech_meta: pd.DataFrame):
-    if tech_meta.empty:
+def validate_tech_units(tech_metadata: pd.DataFrame) -> None:
+    if tech_metadata.empty:
         return
     validate(
-        (tech_meta.loc[:, "Material Unit"].groupby(level=0).nunique() == 1).all(),
+        (tech_metadata.loc[:, "Material Unit"].groupby(level=0).nunique() == 1).all(),
         "There are tech categories with non-unique Material Unit!",
     )
     validate(
-        (tech_meta.loc[:, "Production Unit"].groupby(level=0).nunique() == 1).all(),
+        (tech_metadata.loc[:, "Production Unit"].groupby(level=0).nunique() == 1).all(),
         "There are tech categories with non-unique Production Unit!",
     )
 
@@ -108,7 +103,7 @@ class StandardDataFormat:
     targets: pd.DataFrame | None
     children: dict[str, "StandardDataFormat"]
 
-    tech_meta: pd.DataFrame
+    tech_metadata: pd.DataFrame
 
     def __post_init__(self):
         self.validate()
@@ -117,49 +112,78 @@ class StandardDataFormat:
         return self.targets is not None
 
     def validate(self) -> None:
-        def has(item) -> bool:
-            return item is not None
+        def validate_yearly_keys(base: pd.DataFrame, yearly: dict[Year, pd.DataFrame]):
+            base_keys = set(base.index.unique())
+
+            for year, df in yearly.items():
+                validate(
+                    set(df.index.unique()) <= base_keys,
+                    f"{self.name}: Yearly file ({year}) introduces new items!",
+                )
 
         validate(
-            has(self.targets) != (len(self.children) > 0),
-            "SDF must either have children in the hierarchy or defined targets (leaf level)",
+            (self.targets is not None) != (len(self.children) > 0),
+            f"{self.name}: SDF must either have children in the hierarchy or defined targets (leaf level)",
         )
         validate(
-            has(self.intensities) or not has(self.intensities_yearly),
-            "No base intensities, while yearly files provided!",
+            (self.intensities is not None) or (self.intensities_yearly is None),
+            f"{self.name}: No base intensities, while yearly files provided!",
         )
         validate(
-            has(self.indicators) or not has(self.indicators_yearly),
-            "No base indicators, while yearly files provided!",
+            (self.indicators is not None) or (self.indicators_yearly is None),
+            f"{self.name}: No base indicators, while yearly files provided!",
         )
+        validate_yearly_keys(self.intensities, self.intensities_yearly)
+        validate_yearly_keys(self.indicators, self.indicators_yearly)
+
         try:
-            validate_tech_units(self.tech_meta)
+            validate_tech_units(self.tech_metadata)
         except ValueError as e:
             # This isn't a problem just yet - it's possible that the ones with
             # more than one distinct unit won't be in the targets. It won't bother
             # us then. Just warn for now. We'll validate again for the calculation.
             logging.warning(e)
 
-    def save(self, output_dir: Path) -> None:
-        assert output_dir.is_dir()
-        output_dir = output_dir / self.name
+    def _prepare_output_dir(self, root_dir: Path) -> Path:
+        output_dir = root_dir / self.name
         output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
+
+    def save_intensities(self, root_dir: Path) -> None:
+        output_dir = self._prepare_output_dir(root_dir)
 
         if not self.intensities.empty:
             self.intensities.to_csv(output_dir / "intensities.csv")
         for year, intensities in self.intensities_yearly.items():
             intensities.to_csv(output_dir / f"intensities_{year}.csv")
 
+        for sdf in self.children.values():
+            sdf.save_intensities(output_dir)
+
+    def save_indicators(self, root_dir: Path) -> None:
+        output_dir = self._prepare_output_dir(root_dir)
+
         if not self.indicators.empty:
             self.indicators.to_csv(output_dir / "indicators.csv")
         for year, indicators in self.indicators_yearly.items():
             indicators.to_csv(output_dir / f"indicators_{year}.csv")
 
+        for sdf in self.children.values():
+            sdf.save_indicators(output_dir)
+
+    def save_targets(self, root_dir: Path) -> None:
+        output_dir = self._prepare_output_dir(root_dir)
+
         if self.targets is not None:
             self.targets.to_csv(output_dir / "targets.csv")
         else:
-            for name, sdf in self.children.items():
-                sdf.save(output_dir / name)
+            for sdf in self.children.values():
+                sdf.save_targets(output_dir)
+
+    def save(self, root_dir: Path) -> None:
+        self.save_intensities(root_dir)
+        self.save_indicators(root_dir)
+        self.save_targets(root_dir)
 
 
 def load(input_dir: Path) -> StandardDataFormat:
@@ -215,19 +239,19 @@ def load(input_dir: Path) -> StandardDataFormat:
             logging.warning(f"No targets found in {root.name}. Ignoring.")
             return
         else:
-            # *Move* metadata from all intensity frames into tech_meta
-            tech_meta_cols = ["Description", "Material Unit", "Production Unit"]
+            # *Move* metadata from all intensity frames into tech_metadata
+            tech_metadata_cols = ["Description", "Material Unit", "Production Unit"]
             all_intensities = list(intensities_yearly.values()) + [intensities]
-            all_meta = [
-                i.loc[:, tech_meta_cols] for i in all_intensities if not i.empty
+            all_metadata = [
+                i.loc[:, tech_metadata_cols] for i in all_intensities if not i.empty
             ]
-            if all_meta:
-                tech_meta = pd.concat(all_meta).groupby(level=(0, 1)).last()
+            if all_metadata:
+                tech_metadata = pd.concat(all_metadata).groupby(level=(0, 1)).last()
             else:
-                tech_meta = pd.DataFrame()
+                tech_metadata = pd.DataFrame()
 
             for inten in filter(lambda df: not df.empty, all_intensities):
-                inten.drop(columns=tech_meta_cols, inplace=True)
+                inten.drop(columns=tech_metadata_cols, inplace=True)
 
             return StandardDataFormat(
                 name=root.name,
@@ -237,7 +261,7 @@ def load(input_dir: Path) -> StandardDataFormat:
                 indicators_yearly=indicators_yearly,
                 targets=targets,
                 children=children,
-                tech_meta=tech_meta,
+                tech_metadata=tech_metadata,
             )
 
     root_dfs = dfs(input_dir)

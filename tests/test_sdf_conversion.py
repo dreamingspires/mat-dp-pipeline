@@ -1,16 +1,15 @@
 import difflib
 import logging
+import re
 from pathlib import Path
 from typing import TextIO
 
 import pytest
 
-from mat_dp_pipeline import standard_data_format as sdf
-from mat_dp_pipeline.sdf_to_input import (
-    ProcessableInput,
-    sdf_to_combined_input,
-    sdf_to_processable_input,
-)
+from mat_dp_pipeline.pipeline.common import ProcessableInput
+from mat_dp_pipeline.pipeline.flatten_hierarchy import flatten_hierarchy
+from mat_dp_pipeline.pipeline.sparse_to_processable_input import to_processable_input
+from mat_dp_pipeline.sdf import standard_data_format as sdf
 
 
 class DiffError(Exception):
@@ -40,8 +39,9 @@ def to_markdown(output: TextIO, path: Path, year: sdf.Year, inpt: ProcessableInp
 
 def process_sdf_to_markdown(root: Path, output: TextIO):
     output.write(f"# {root.name} processed into ProcesableInput\n")
-    for path, year, inpt in sdf_to_processable_input(sdf.load(root)):
-        to_markdown(output, path, year, inpt)
+    for path, sparse_years_input in flatten_hierarchy(sdf.load(root)):
+        for path, year, inpt in to_processable_input(path, sparse_years_input):
+            to_markdown(output, path, year, inpt)
 
 
 @pytest.mark.parametrize("test_name", ["World", "HierarchyTest", "ScalingTest"])
@@ -78,7 +78,10 @@ def test_hierarchy(data_path, test_name: str):
 
 
 def test_failure_new_tech_in_yearly_file(data_path):
-    with pytest.raises(AssertionError, match="Yearly file cannot introduce new items!"):
-        list(
-            sdf_to_combined_input(sdf.load(data_path("Invalid_YearlyFileWithNewTech")))
-        )
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Invalid_YearlyFileWithNewTech: Yearly file (2020) introduces new items!"
+        ),
+    ):
+        list(flatten_hierarchy(sdf.load(data_path("Invalid_YearlyFileWithNewTech"))))

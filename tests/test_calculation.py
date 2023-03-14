@@ -2,8 +2,7 @@ from io import StringIO
 
 import pandas as pd
 
-from mat_dp_pipeline.calculation import calculate
-from mat_dp_pipeline.sdf_to_input import ProcessableInput
+from mat_dp_pipeline.pipeline.calculation import calculate
 
 
 def test_calculation(calculation_test_input):

@@ -1,30 +1,40 @@
 import argparse
 from pathlib import Path
 
-from mat_dp_pipeline import App, pipeline
-from mat_dp_pipeline.data_sources.mat_dp_db import MatDpDB
+import mat_dp_pipeline.data_sources as ds
+from mat_dp_pipeline import App, create_sdf, pipeline
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sdf-output-dir", type=Path)
+    # TODO: groups. either sdf-source or materials & targets (+their types of data source)
+    parser.add_argument("--sdf-source", type=Path)
     parser.add_argument("--materials", type=Path)
     parser.add_argument("--targets", type=Path)
+    parser.add_argument("--sdf-output", type=Path)
 
     args = parser.parse_args()
 
-    # path = Path(__file__).parent.parent / "test_data/World"
-    # output = pipeline(path)
-
-    # MATERIALS_EXCEL = "scratch/Material_intensities_database.xlsx"
-    # TARGETS_CSV = "scratch/results_1.5deg.csv"
     TARGETS_PARAMETERS = [
         "Power Generation (Aggregate)",
         "Power Generation Capacity (Aggregate)",
     ]
 
-    ds = MatDpDB(args.materials, args.targets, TARGETS_PARAMETERS)
-    output = pipeline(ds, output_path=args.sdf_output_dir)
+    if not args.sdf_source:
+        # TODO: this is just a quick hacky/demo version of course
+        assert args.materials and args.targets
+        sdf = create_sdf(
+            intensities=ds.MatDPDBIntensitiesSource(args.materials),
+            indicators=ds.MatDPDBIndicatorsSource(args.materials),
+            targets=ds.TMBATargetsSource(args.targets, TARGETS_PARAMETERS),
+        )
+    else:
+        sdf = create_sdf(args.sdf_source)
+
+    if args.sdf_output:
+        sdf.save(args.sdf_output)
+
+    output = pipeline(sdf)
     App(output, ["Parameter"]).serve()
 
 
