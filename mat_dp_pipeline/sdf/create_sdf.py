@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 from typing import overload
 
-import mat_dp_pipeline.data_sources.definitions as ds
+import mat_dp_pipeline.abstract_data_sources as ds
 from mat_dp_pipeline.sdf.standard_data_format import StandardDataFormat, load
 
 

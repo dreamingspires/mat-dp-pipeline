@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from mat_dp_pipeline.data_sources.definitions import IndicatorsSource, IntensitiesSource
+from mat_dp_pipeline.abstract_data_sources import IndicatorsSource, IntensitiesSource
 from mat_dp_pipeline.data_sources.utils import location_to_path
 
 

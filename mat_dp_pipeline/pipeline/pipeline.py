@@ -6,10 +6,8 @@ from typing import Iterator, overload
 import pandas as pd
 
 from mat_dp_pipeline.pipeline.calculation import ProcessedOutput, calculate
-from mat_dp_pipeline.pipeline.sdf_to_input import (
-    flatten_hierarchy,
-    to_processable_input,
-)
+from mat_dp_pipeline.pipeline.flatten_hierarchy import flatten_hierarchy
+from mat_dp_pipeline.pipeline.sparse_to_processable_input import to_processable_input
 from mat_dp_pipeline.sdf import StandardDataFormat, Year
 
 

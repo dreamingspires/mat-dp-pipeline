@@ -6,11 +6,9 @@ from typing import TextIO
 
 import pytest
 
-from mat_dp_pipeline.pipeline.sdf_to_input import (
-    ProcessableInput,
-    flatten_hierarchy,
-    sdf_to_processable_input,
-)
+from mat_dp_pipeline.pipeline.common import ProcessableInput
+from mat_dp_pipeline.pipeline.flatten_hierarchy import flatten_hierarchy
+from mat_dp_pipeline.pipeline.sparse_to_processable_input import to_processable_input
 from mat_dp_pipeline.sdf import standard_data_format as sdf
 
 
@@ -41,8 +39,9 @@ def to_markdown(output: TextIO, path: Path, year: sdf.Year, inpt: ProcessableInp
 
 def process_sdf_to_markdown(root: Path, output: TextIO):
     output.write(f"# {root.name} processed into ProcesableInput\n")
-    for path, year, inpt in sdf_to_processable_input(sdf.load(root)):
-        to_markdown(output, path, year, inpt)
+    for path, sparse_years_input in flatten_hierarchy(sdf.load(root)):
+        for path, year, inpt in to_processable_input(path, sparse_years_input):
+            to_markdown(output, path, year, inpt)
 
 
 @pytest.mark.parametrize("test_name", ["World", "HierarchyTest", "ScalingTest"])
