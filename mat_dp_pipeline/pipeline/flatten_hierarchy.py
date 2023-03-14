@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from pathlib import Path
 from typing import Iterator
 
@@ -36,10 +37,10 @@ def overlay_in_order(
 
 def flatten_hierarchy(
     root_sdf: StandardDataFormat,
-) -> Iterator[tuple[Path, SparseYearsInput]]:
+) -> list[tuple[Path, SparseYearsInput]]:
     def dfs(
         root: StandardDataFormat, inpt: SparseYearsInput, label: Path
-    ) -> Iterator[tuple[Path, SparseYearsInput]]:
+    ) -> Iterator[tuple[Path, SparseYearsInput, set[str]]]:
         validate(
             root.indicators.empty
             or inpt.indicators.empty
@@ -78,13 +79,8 @@ def flatten_hierarchy(
 
             # TODO: add a parameter controlling whether validation yields a warning or exception or is ignored
             # Maybe group the errors and show at the end, otherwise there's a LOT of errors
-            try:
-                overlaid.validate()
-            except ValueError as e:
-                logging.error(f"Validation failed for {label}")
-                logging.error(e)
-                # raise e
-            yield label, overlaid
+            mismatched_resources = overlaid.validate()
+            yield label, overlaid, mismatched_resources
 
     initial = SparseYearsInput(
         intensities=pd.DataFrame(),
@@ -92,4 +88,17 @@ def flatten_hierarchy(
         indicators=pd.DataFrame(),
         tech_metadata=pd.DataFrame(),
     )
-    yield from dfs(root_sdf, initial, Path(root_sdf.name))
+
+    ret = []
+    all_mismatched_resources: dict[tuple[str, ...], list[Path]] = defaultdict(list)
+    for label, sparse_years, mismatched_resources in dfs(
+        root_sdf, initial, Path(root_sdf.name)
+    ):
+        ret.append((label, sparse_years))
+        if mismatched_resources:
+            all_mismatched_resources[tuple(sorted(mismatched_resources))].append(label)
+
+    # TODO: better logging
+    logging.warning(f"Mismatched resources: {all_mismatched_resources}!")
+
+    return ret

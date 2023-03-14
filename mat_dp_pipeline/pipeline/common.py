@@ -39,31 +39,52 @@ class SparseYearsInput:
             tech_metadata=self.tech_metadata.copy(),
         )
 
-    def validate(self) -> None:
+    def validate(self) -> set[str]:
         """Validates whether an object represents a valid instance of
-        CombinedInput.
+        CombinedInput. Apart from validation, it also narrows down the set of
+        techs and resources to match the frames.
 
         Raises:
             ValueError: when validation fails
+
+        Returns:
+            set[str]: mismatched resources. It's up to the client code to decide
+            whether it's an error or not. No exception is thrown here if this set
+            isn't empty.
         """
         sdf.validate_tech_units(self.tech_metadata)
-        # TODO: reindex also intensities vs targets techs
+        intensities_techs = self.intensities.index.droplevel(0).unique()
+        targets_techs = self.targets.index
+
+        validate(
+            set(targets_techs) <= set(intensities_techs),
+            "Target's techs must be a subset of intensities' techs!",
+        )
+
+        # move years to columns, reindex techs, bring the years back
+        self.intensities = (
+            self.intensities.unstack(level=0)  # type: ignore
+            .reindex(targets_techs)
+            .stack()
+            .reorder_levels(["Year", "Category", "Specific"])
+            .sort_index()
+        )
+        # unstack/stack messes with types
+        assert isinstance(self.intensities, pd.DataFrame)
+
         intensities_resources = set(self.intensities.columns)
         indicators_resources = set(self.indicators.index.get_level_values("Resource"))
         common_resources = intensities_resources & indicators_resources
-        diff = intensities_resources.symmetric_difference(indicators_resources)
-        if diff:
+        mismatched_resources = intensities_resources.symmetric_difference(
+            indicators_resources
+        )
+        if mismatched_resources:
             sorted_resources = sorted(common_resources)
             self.intensities = self.intensities.reindex(columns=sorted_resources)
             self.indicators = self.indicators.reindex(
                 sorted_resources, level="Resource"
             )
-
-        # TODO: this is weird, throwing after reindex? Maybe ok? Discussion needed ;)
-        validate(
-            not diff,
-            f"Intensities' and indicators' resources aren't matched on keys: {diff}",
-        )
+        return mismatched_resources
 
 
 @dataclass(eq=False, order=False)
